@@ -1,0 +1,92 @@
+{% extends 'core/base.html' %}
+
+{% block title %}分析儀表板{% endblock %}
+
+{% block content %}
+<h1>分析儀表板</h1>
+<p>以下是公司目前的人力資源數據概覽。</p>
+
+<div class="stats-summary">
+    <div class="stat-card">
+        <h3>在職員工總數</h3>
+        <p class="stat-number">{{ total_employees }}</p>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-container">
+        <h3>各部門員工人數</h3>
+        <canvas id="departmentChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <h3>員工性別比例</h3>
+        <canvas id="genderChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <h3>本年度休假類型分佈</h3>
+        <canvas id="leaveTypeChart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 2. 從後端接收 JSON 格式的數據
+        const departmentData = JSON.parse('{{ department_distribution_json|safe }}');
+        const genderData = JSON.parse('{{ gender_distribution_json|safe }}');
+        const leaveTypeData = JSON.parse('{{ leave_type_distribution_json|safe }}');
+
+        // 3. 繪製部門分佈長條圖
+        new Chart(document.getElementById('departmentChart'), {
+            type: 'bar',
+            data: {
+                labels: departmentData.map(d => d.department__name),
+                datasets: [{
+                    label: '員工人數',
+                    data: departmentData.map(d => d.count),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+
+        // 4. 繪製性別比例圓餅圖
+        new Chart(document.getElementById('genderChart'), {
+            type: 'pie',
+            data: {
+                labels: genderData.map(g => g.gender),
+                datasets: [{
+                    data: genderData.map(g => g.count),
+                    backgroundColor: ['rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)'],
+                }]
+            }
+        });
+
+        // 5. 繪製休假類型甜甜圈圖
+        new Chart(document.getElementById('leaveTypeChart'), {
+            type: 'doughnut',
+            data: {
+                labels: leaveTypeData.map(l => l.leave_type__name),
+                datasets: [{
+                    data: leaveTypeData.map(l => l.count),
+                    backgroundColor: ['rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)'],
+                }]
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-summary { display: flex; gap: 20px; margin-bottom: 30px; }
+    .stat-card { background-color: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; flex-grow: 1; }
+    .stat-card h3 { margin-top: 0; }
+    .stat-card .stat-number { font-size: 2.5rem; font-weight: bold; color: #007bff; }
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+    .chart-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+</style>
+{% endblock %}

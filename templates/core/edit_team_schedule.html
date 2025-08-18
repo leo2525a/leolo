@@ -1,0 +1,54 @@
+{% extends 'core/base.html' %}
+{% load custom_filters %}  {% block title %}編輯團隊班表{% endblock %}
+
+{% block content %}
+<h1>編輯團隊班表</h1>
+<p>為您的團隊設定 **下一週 ({{ week_dates.0|date:"Y-m-d" }} 至 {{ week_dates.6|date:"Y-m-d" }})** 的工作時間。</p>
+<p class="text-muted">請使用 24 小時制格式 (例如 09:00, 18:00)。將時間留空表示當天休息。</p>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="table-responsive" style="margin-top: 20px;">
+        <table class="schedule-edit-table">
+            <thead>
+                <tr>
+                    <th>員工姓名</th>
+                    {% for day in week_dates %}
+                        <th>{{ day|date:"D" }} <small>({{ day|date:"m-d" }})</small></th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for employee in team_members %}
+                    <tr>
+                        <td><strong>{{ employee.user.get_full_name }}</strong></td>
+                        {% for day in week_dates %}
+                            {% with shift=schedule_map|get_item:employee.id|get_item:day %}
+                                <td>
+                                    <input type="time" name="start_time_{{ employee.id }}_{{ day|date:'Y-m-d' }}" 
+                                           value="{{ shift.0|date:'H:i'|default:'' }}" class="time-input">
+                                    <input type="time" name="end_time_{{ employee.id }}_{{ day|date:'Y-m-d' }}" 
+                                           value="{{ shift.1|date:'H:i'|default:'' }}" class="time-input">
+                                </td>
+                            {% endwith %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="submit" class="btn-submit" style="margin-top: 20px;">儲存班表變更</button>
+</form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .schedule-edit-table { width: 100%; border-collapse: collapse; text-align: center; }
+    .schedule-edit-table th, .schedule-edit-table td { border: 1px solid #dee2e6; padding: 8px; }
+    .schedule-edit-table th { background-color: #f8f9fa; }
+    .schedule-edit-table td:first-child { text-align: left; background-color: #f8f9fa; }
+    .time-input { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn-submit { /* ...樣式不變... */ }
+    .text-muted { color: #6c757d; }
+</style>
+{% endblock %}

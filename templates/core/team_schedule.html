@@ -1,0 +1,79 @@
+{% extends 'core/base.html' %}
+{% load custom_filters %}
+
+{% block title %}團隊月表{% endblock %}
+
+{% block content %}
+<div class="schedule-header">
+    <a href="{% url 'core:team_schedule' prev_month.year prev_month.month %}">❮ 上個月</a>
+    <h1>{{ target_date|date:"Y 年 n 月" }}</h1>
+    <a href="{% url 'core:team_schedule' next_month.year next_month.month %}">下個月 ❯</a>
+</div>
+
+<div class="table-responsive" style="margin-top: 20px;">
+    <table class="schedule-table">
+        <thead>
+            <tr>
+                <th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for week in month_days %}
+                <tr>
+                    {% for day in week %}
+                        <td class="{% if day.month != target_date.month %}noday{% endif %}">
+                            <div class="day-header">
+                                <span class="day-number">{{ day.day }}</span>
+                                {% with holiday=public_holidays_map|get_item:day %}
+                                    {% if holiday %}
+                                        <span class="status-badge holiday">{{ holiday }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                            <div class="day-content">
+                                {% if not holiday %}
+                                    {% for emp in active_employees %}
+                                        {% with status_info=schedule_map|get_item:emp.id|get_item:day %}
+                                            {% if status_info %}
+                                                <div class="employee-status status-{{ status_info.status|slugify }}">
+                                                    <strong>{{ emp.user.first_name }}:</strong> {{ status_info.details }}
+                                                </div>
+                                            {% else %}
+                                                {% with rule=emp.work_schedule_rules|get_item:day.weekday %}
+                                                    {% if rule %}
+                                                        <div class="employee-status status-on-duty">
+                                                            <strong>{{ emp.user.first_name }}:</strong> {{ rule.start_time|date:"H:i" }}-{{ rule.end_time|date:"H:i" }}
+                                                        </div>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .schedule-header { display: flex; justify-content: space-between; align-items: center; }
+    .schedule-table { table-layout: fixed; width: 100%; border-collapse: collapse; }
+    .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; vertical-align: top; height: 120px; }
+    .schedule-table th { padding: 8px; text-align: center; background-color: #f8f9fa; }
+    .day-header { padding: 5px; text-align: right; }
+    .day-header .day-number { font-weight: bold; }
+    .day-header .holiday { display: block; background-color: #cce5ff; color: #004085; font-size: 0.8em; padding: 2px 4px; border-radius: 4px; margin-top: 5px; }
+    .day-content { padding: 5px; }
+    .noday { background-color: #f9f9f9; color: #ccc; }
+    .employee-status { font-size: 0.8em; padding: 2px 4px; border-radius: 3px; margin-bottom: 3px; }
+    .status-on-duty { background-color: #e9ecef; }
+    .status-approved { background-color: #f8d7da; color: #721c24; } /* 已批准休假 */
+    .status-pending { background-color: #fff3cd; color: #856404; } /* 待審核休假 */
+</style>
+{% endblock %}

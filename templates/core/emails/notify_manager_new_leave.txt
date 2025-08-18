@@ -1,0 +1,17 @@
+主旨: [待審批] {{ employee_name }} 的休假申請
+
+您好 {{ manager_name }},
+
+您的團隊成員 {{ employee_name }} 提交了一筆新的休假申請。
+
+詳細資訊如下：
+- 假別: {{ leave_type }}
+- 開始時間: {{ start_datetime|date:"Y-m-d H:i" }}
+- 結束時間: {{ end_datetime|date:"Y-m-d H:i" }}
+- 事由: {{ reason }}
+
+請前往您的管理儀表板進行審批：
+{{ dashboard_url }}
+
+謝謝您！
+TalentCore HRM 系統

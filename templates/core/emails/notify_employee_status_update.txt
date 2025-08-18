@@ -1,0 +1,16 @@
+主旨: 您的休假申請狀態已更新為 [{{ status }}]
+
+您好 {{ employee_name }},
+
+您提交的休假申請狀態已更新。
+
+詳細資訊如下：
+- 假別: {{ leave_type }}
+- 開始時間: {{ start_datetime|date:"Y-m-d H:i" }}
+- 結束時間: {{ end_datetime|date:"Y-m-d H:i" }}
+- 最新狀態: {{ status }}
+
+您可以前往您的個人資料頁面查看所有申請記錄。
+
+謝謝！
+TalentCore HRM 系統

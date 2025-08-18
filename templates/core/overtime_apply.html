@@ -1,0 +1,43 @@
+{% extends 'core/base.html' %}
+
+{% block title %}申請加班{% endblock %}
+
+{% block content %}
+<h1>加班申請表</h1>
+<p>請填寫您的加班資訊，批准後時數將自動轉為補休。</p>
+
+<form method="post" class="form-card">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn-submit">提交申請</button>
+</form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background-color: #fff;
+        padding: 25px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    .form-card p { margin-bottom: 15px; }
+    .form-card label { display: block; margin-bottom: 5px; font-weight: bold; }
+    .form-card input, .form-card textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .btn-submit {
+        background-color: #007bff;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

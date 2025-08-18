@@ -1,0 +1,252 @@
+{% extends 'core/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Manager Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .btn-primary {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: 500;
+    }
+
+    .request-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    .request-table th, .request-table td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+    }
+    .request-table th {
+        background-color: #f2f2f2;
+    }
+    .actions a {
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-right: 5px;
+    }
+    .approve-btn {
+        background-color: #28a745;
+    }
+    .reject-btn {
+        background-color: #dc3545;
+    }
+    .calendar-container {
+        margin-top: 40px;
+    }
+    .calendar {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .calendar th, .calendar td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+        vertical-align: top;
+        height: 80px;
+    }
+    .calendar th {
+        background-color: #f2f2f2;
+        height: auto;
+    }
+    .calendar .day-number {
+        font-weight: bold;
+        text-align: right;
+        display: block;
+    }
+    .calendar .noday {
+        background-color: #f9f9f9;
+    }
+    .calendar .today .day-number {
+        background-color: #007bff;
+        color: white;
+        border-radius: 50%;
+        width: 2em;
+        height: 2em;
+        line-height: 2em;
+        text-align: center;
+        display: inline-block;
+    }
+    .on-leave {
+        font-size: 0.8rem;
+        background-color: #e2e3e5;
+        color: #495057;
+        padding: 2px 4px;
+        border-radius: 3px;
+        display: block;
+        margin-top: 5px;
+        text-align: left;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>團隊儀表板</h1>
+        <a href="{% url 'core:edit_team_schedule' %}" class="btn-primary">編輯下週班表</a>
+        <a href="{% url 'core:manual_attendance' %}" class="btn-secondary">手動補登打卡</a> <!-- 👈 為經理新增 -->
+    </div>
+    <hr>
+
+    <h2>團隊休假審批</h2>
+
+    {% if messages %}
+        <div class="messages" style="margin-top: 15px;">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+        </div>
+    {% endif %}
+
+    <p>以下是您團隊成員提交的待審核休假申請。</p>
+
+    {% if pending_leaves %}
+        <div class="table-responsive">
+            <table class="request-table">
+                <thead>
+                    <tr>
+                        <th>申請人</th>
+                        <th>假別</th>
+                        <th>起訖日期</th>
+                        <th>申請事由</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in pending_leaves %}
+                        <tr>
+                            <td>{{ request.employee.user.get_full_name }}</td>
+                            <td>{{ request.leave_type.name }}</td>
+                            <td>{{ request.start_datetime|date:"Y-m-d H:i" }} to {{ request.end_datetime|date:"Y-m-d H:i" }}</td>                            <td>{{ request.reason }}</td>
+                            <td class="actions">
+                                <a href="{% url 'core:leave_approve' request.id %}" class="approve-btn">批准</a>
+                                <a href="{% url 'core:leave_reject' request.id %}" class="reject-btn">拒絕</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p style="margin-top: 20px;">目前沒有待審核的申請。</p>
+    {% endif %}
+
+    <hr style="margin-top: 40px; margin-bottom: 40px;">
+    <h2>團隊加班審批</h2>
+    <p>批准後，加班時數將自動轉為員工的補休時數。</p>
+
+    {% if pending_overtime %}
+        <div class="table-responsive">
+            <table class="request-table">
+                <thead>
+                    <tr>
+                        <th>申請人</th>
+                        <th>加班日期</th>
+                        <th>加班時數</th>
+                        <th>加班事由</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ot in pending_overtime %}
+                        <tr>
+                            <td>{{ ot.employee.user.get_full_name }}</td>
+                            <td>{{ ot.date }}</td>
+                            <td>{{ ot.hours }} 小時</td>
+                            <td>{{ ot.reason }}</td>
+                            <td class="actions">
+                                <a href="{% url 'core:overtime_approve' ot.id %}" class="approve-btn">批准</a>
+                                <a href="{% url 'core:overtime_reject' ot.id %}" class="reject-btn">拒絕</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p style="margin-top: 20px;">目前沒有待審核的加班申請。</p>
+    {% endif %}
+    
+    <hr style="margin-top: 40px; margin-bottom: 40px;">
+    <h2>待處理的績效評估</h2>
+    <p>以下是您團隊成員已提交或進行中的績效評估。</p>
+
+    {% if pending_reviews %}
+        <table class="request-table">
+            <thead>
+                <tr>
+                    <th>評估週期</th>
+                    <th>員工</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for review in pending_reviews %}
+                    <tr>
+                        <td>{{ review.cycle.name }}</td>
+                        <td>{{ review.employee.user.get_full_name }}</td>
+                        <td>{{ review.status }}</td>
+                        <td>
+                            <a href="{% url 'core:manager_review_detail' review.id %}" class="approve-btn">進入評估</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>目前沒有待處理的績效評估。</p>
+    {% endif %}
+
+    
+
+    <div class="calendar-container">
+        <h3>團隊假期月曆</h3>
+        <table class="calendar">
+            <thead>
+                <tr>
+                    <th>日</th>
+                    <th>一</th>
+                    <th>二</th>
+                    <th>三</th>
+                    <th>四</th>
+                    <th>五</th>
+                    <th>六</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in month_days %}
+                    <tr>
+                        {% for day in week %}
+                            {% with day_ordinal=day.toordinal %}
+                                <td class="{% if day.month != today_ordinal.month %}noday{% endif %} {% if day_ordinal == today_ordinal %}today{% endif %}">
+                                    <div class="day-number">{{ day.day }}</div>
+                                    <div class="leave-events">
+                                        {% if leave_dates|get_item:day_ordinal %}
+                                            {% for name in leave_dates|get_item:day_ordinal %}
+                                                <span class="on-leave">{{ name }}</span>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            {% endwith %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

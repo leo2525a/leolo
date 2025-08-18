@@ -1,0 +1,50 @@
+    {% extends 'core/base.html' %}
+
+    {% block title %}手動補登打卡{% endblock %}
+
+    {% block content %}
+    <h1>手動補登團隊打卡</h1>
+    <p>為您的團隊成員補登或修正打卡記錄。</p>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="employee">選擇員工</label>
+            <select name="employee" class="form-control" required>
+                {% for emp in team_members %}
+                <option value="{{ emp.id }}">{{ emp.user.get_full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="date">日期</label>
+            <input type="date" name="date" class="form-control" required>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="clock_in">上班時間</label>
+                <input type="time" name="clock_in" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="clock_out">下班時間 (可選)</label>
+                <input type="time" name="clock_out" class="form-control">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="notes">備註</label>
+            <input type="text" name="notes" class="form-control" placeholder="例如：忘記打卡" required>
+        </div>
+        <button type="submit" class="btn-submit">提交補登</button>
+    </form>
+    {% endblock %}
+
+    {% block extra_css %}
+    <style>
+        .form-card { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-row { display: flex; gap: 20px; }
+        .form-control { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn-submit { /* ...樣式不變... */ }
+    </style>
+    {% endblock %}
+    

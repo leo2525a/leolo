@@ -1,0 +1,61 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Employee Directory{% endblock %}
+
+{% block extra_css %}
+<style>
+    .directory-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+    .employee-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        background-color: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: box-shadow 0.3s ease;
+    }
+    .employee-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .employee-card h3 {
+        margin-top: 0;
+        color: #007bff;
+    }
+    .employee-card p {
+        margin: 5px 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    .employee-card .email-link {
+        color: #007bff;
+        text-decoration: none;
+    }
+    .employee-card .email-link:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <h1>員工目錄</h1>
+    <p>在這裡可以找到公司所有同仁的聯絡資訊。</p>
+
+    <div class="directory-grid" style="margin-top: 30px;">
+        {% for emp in employees %}
+            <div class="employee-card">
+                <h3>{{ emp.user.get_full_name|default:emp.user.username }}</h3>
+                <p><strong>職位:</strong> {{ emp.position.title|default:"N/A" }}</p>
+                <p><strong>部門:</strong> {{ emp.department.name|default:"N/A" }}</p>
+                <p>
+                    <strong>Email:</strong> 
+                    <a href="mailto:{{ emp.user.email }}" class="email-link">{{ emp.user.email }}</a>
+                </p>
+            </div>
+        {% empty %}
+            <p>目前沒有員工資料可顯示。</p>
+        {% endfor %}
+    </div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends 'core/base.html' %}
+
+{% block title %}評估: {{ review.employee.user.get_full_name }}{% endblock %}
+
+{% block content %}
+<h1>績效評估: {{ review.employee.user.get_full_name }}</h1>
+<p><strong>評估週期:</strong> {{ review.cycle.name }}</p>
+<hr>
+
+<div class="review-section">
+    <h2>員工目標</h2>
+    {% for goal in review.goals.all %}
+        <p class="goal-item">- {{ goal.description }}</p>
+    {% empty %}
+        <p class="text-muted">員工尚未設定目標。</p>
+    {% endfor %}
+</div>
+
+<div class="review-section">
+    <h2>員工自評</h2>
+    <div class="assessment-box">
+        {{ review.employee_self_assessment|linebreaksbr|default:"員工尚未填寫自評。" }}
+    </div>
+</div>
+
+<hr style="margin-top: 30px;">
+
+<form method="post">
+    {% csrf_token %}
+    <h2>經理評語與評分</h2>
+
+    <label for="manager_assessment">您的評語</label>
+    <textarea name="manager_assessment" class="form-control" rows="8">{{ review.manager_assessment|default_if_none:'' }}</textarea>
+
+    <label for="overall_rating" style="margin-top: 20px;">總體評分</label>
+    <select name="overall_rating" class="form-control">
+        <option value="">---------</option>
+        {% for rating_value, rating_display in review.get_rating_choices %}
+            <option value="{{ rating_value }}" {% if review.overall_rating == rating_value %}selected{% endif %}>
+                {{ rating_display }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <button type="submit" class="btn-submit" style="margin-top: 20px;">提交並完成評估</button>
+</form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .review-section { margin-bottom: 25px; }
+    .assessment-box {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        padding: 15px;
+        border-radius: 5px;
+        min-height: 100px;
+    }
+    .goal-item { margin-left: 20px; }
+    .text-muted { color: #6c757d; }
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        box-sizing: border-box;
+        display: block;
+    }
+    .btn-submit {
+        background-color: #007bff;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

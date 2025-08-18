@@ -1,0 +1,44 @@
+{% extends 'core/base.html' %}
+
+{% block title %}我的績效評估{% endblock %}
+
+{% block content %}
+<h1>我的績效評估</h1>
+<p>以下是所有指派給您的績效評估。請點擊進入以填寫您的目標和自評。</p>
+
+<div class="list-group" style="margin-top: 20px;">
+    {% for review in reviews %}
+        <a href="{% url 'core:review_detail' review.id %}" class="list-group-item">
+            <strong>{{ review.cycle.name }}</strong>
+            <span class="status-badge">{{ review.status }}</span>
+        </a>
+    {% empty %}
+        <p>目前沒有指派給您的績效評估。</p>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .list-group-item {
+        display: block;
+        padding: 15px 20px;
+        border: 1px solid #ddd;
+        background-color: #fff;
+        text-decoration: none;
+        color: #333;
+        margin-bottom: -1px; /* 讓邊框重疊 */
+    }
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+    .status-badge {
+        float: right;
+        background-color: #6c757d;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}

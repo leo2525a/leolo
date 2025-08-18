@@ -1,0 +1,177 @@
+{% extends 'core/base.html' %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+    .document-list {
+    list-style-type: none;
+    padding-left: 0;
+    }
+    .document-list li {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .document-list li:last-child {
+        border-bottom: none;
+    }
+    .document-list a {
+        font-weight: 500;
+        text-decoration: none;
+        color: #007bff;
+    }
+    .document-list a:hover {
+        text-decoration: underline;
+    }
+    .upload-date {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .profile-card { padding: 20px 30px; }
+    .profile-card p { line-height: 1.6; }
+    .profile-card strong { color: #000; }
+    .actions-bar { margin-top: 20px; }
+    .leave-table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px; }
+    .leave-table th, .leave-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .leave-table th { background-color: #f2f2f2; }
+
+    .stats-container {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+    padding: 20px 0;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    }
+    .stat-card {
+        padding: 10px;
+    }
+    .stat-card .number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+    .stat-card .label {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    .announcement-section {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    }
+    .announcement {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+    .announcement:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .announcement h4 {
+        margin-bottom: 5px;
+    }
+    .announcement p {
+        margin-bottom: 8px;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="profile-card">
+        <h1>個人儀表板</h1>
+
+        {% if latest_announcements %}
+        <div class="announcement-section">
+            <h2>最新公告</h2>
+            {% for announcement in latest_announcements %}
+                <div class="announcement">
+                    <h4>{{ announcement.title }}</h4>
+                    <p>{{ announcement.content|linebreaksbr }}</p>
+                    <small class="text-muted">發布於: {{ announcement.created_at|date:"Y-m-d" }} by {{ announcement.author.get_full_name|default:announcement.author.username }}</small>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    </div>
+
+        <div class="stats-container">
+            {% for balance in leave_balances_data %}
+                <div class="stat-card">
+                    <div class="number">{{ balance.remaining|floatformat:2 }}</div>
+                    <div class="label">{{ balance.name }} 剩餘時數</div>
+                    <small>(總額度: {{ balance.total|floatformat:2 }}, 已用: {{ balance.used|floatformat:2 }})</small>
+                </div>
+            {% empty %}
+                <p>尚無假期餘額資料。</p>
+            {% endfor %}
+        </div>
+
+        {% if messages %}
+            <div class="messages">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+
+        <hr>
+        <p><strong>員工編號:</strong> {{ employee.employee_number }}</p>
+        <p><strong>部門:</strong> {{ employee.department.name }}</p>
+        <p><strong>職位:</strong> {{ employee.position.title }}</p>
+        <p><strong>目前薪資:</strong> {% if current_salary %}${{ current_salary.base_salary|floatformat:2 }}{% else %}N/A{% endif %}</p>
+        <p><strong>入職日期:</strong> {{ employee.hire_date }}</p>
+        <p><strong>狀態:</strong> {{ employee.get_status_display }}</p>
+        <hr style="margin-top: 30px; margin-bottom: 30px;">
+        <h2>我的請假記錄</h2>
+
+        {% if leave_requests %}
+            <table class="leave-table">
+                <thead>
+                    <tr>
+                        <th>假別</th>
+                        <th>開始日期</th>
+                        <th>結束日期</th>
+                        <th>狀態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in leave_requests %}
+                        <tr>
+                            <td>{{ request.leave_type.name }}</td>
+                            <td>{{ request.start_datetime|date:"Y-m-d H:i" }}</td>
+                            <td>{{ request.end_datetime|date:"Y-m-d H:i" }}</td>
+                            <td>{{ request.get_status_display }}</td>                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>您目前沒有任何請假記錄。</p>
+        {% endif %}
+        <hr style="margin-top: 30px; margin-bottom: 30px;">
+        <h2>我的文件</h2>
+        {% with documents=employee.documents.all %}
+            {% if documents %}
+                <ul class="document-list">
+                    {% for doc in documents %}
+                        <li>
+                            <a href="{{ doc.file.url }}" target="_blank">{{ doc.title }}</a>
+                            <span class="upload-date"> (上傳於: {{ doc.uploaded_at|date:"Y-m-d" }})</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>目前沒有任何個人文件。</p>
+            {% endif %}
+        {% endwith %}
+        </div>
+    {% endblock %}
+   

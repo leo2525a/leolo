@@ -1,0 +1,67 @@
+    {% extends 'core/base.html' %}
+
+    {% block title %}招聘管道: {{ job.title }}{% endblock %}
+
+    {% block content %}
+    <h1>招聘管道</h1>
+    <h2>{{ job.title }}</h2>
+    <p>管理此職缺的所有應徵者。</p>
+
+    <div class="table-responsive" style="margin-top: 20px;">
+        <table class="pipeline-table">
+            <thead>
+                <tr>
+                    <th>候選人</th>
+                    <th>Email</th>
+                    <th>應徵時間</th>
+                    <th>履歷</th>
+                    <th>目前狀態</th>
+                    <th>更新狀態</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for app in applications %}
+                    <tr>
+                        <td><strong>{{ app.candidate.get_full_name }}</strong></td>
+                        <td>{{ app.candidate.email }}</td>
+                        <td>{{ app.applied_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <a href="{{ app.candidate.resume.url }}" target="_blank">查看履歷</a>
+                        </td>
+                        <td><span class="status-badge status-{{ app.status|slugify }}">{{ app.get_status_display }}</span></td>
+                        <td>
+                            <form action="{% url 'core:update_application_status' app.id %}" method="post" class="status-form">
+                                {% csrf_token %}
+                                <select name="status" onchange="this.form.submit()">
+                                    {% for value, display in status_choices %}
+                                        <option value="{{ value }}" {% if app.status == value %}selected{% endif %}>{{ display }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center;">此職缺目前沒有任何應徵者。</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endblock %}
+
+    {% block extra_css %}
+    <style>
+        .pipeline-table { width: 100%; border-collapse: collapse; }
+        .pipeline-table th, .pipeline-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .status-form select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
+        .status-badge { padding: 5px 10px; border-radius: 12px; color: white; font-size: 0.8rem; }
+        .status-applied { background-color: #007bff; }
+        .status-screening { background-color: #17a2b8; }
+        .status-interview { background-color: #ffc107; color: #212529; }
+        .status-offered { background-color: #fd7e14; }
+        .status-hired { background-color: #28a745; }
+        .status-rejected { background-color: #6c757d; }
+    </style>
+    {% endblock %}
+    

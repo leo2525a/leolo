@@ -1,0 +1,59 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ review.cycle.name }}{% endblock %}
+
+{% block content %}
+<h1>{{ review.cycle.name }}</h1>
+<p><strong>評估期間：</strong>{{ review.cycle.start_date }} 至 {{ review.cycle.end_date }}</p>
+<hr>
+
+<form method="post">
+    {% csrf_token %}
+
+    <h2>我的目標</h2>
+    <p>請在此處列出您在此評估期間內的主要工作目標。</p>
+    {{ formset.management_form }}
+    <div id="goal-forms">
+        {% for form in formset %}
+            <div class="goal-form">
+                {{ form.as_p }}
+            </div>
+        {% endfor %}
+    </div>
+
+    <hr style="margin-top: 30px;">
+
+    <h2>員工自評</h2>
+    <p>請總結您在此評估期間的表現、成就與挑戰。</p>
+    <textarea name="employee_self_assessment" class="form-control" rows="8">{{ review.employee_self_assessment|default_if_none:'' }}</textarea>
+
+    <button type="submit" class="btn-submit" style="margin-top: 20px;">儲存我的評估</button>
+</form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .goal-form {
+        padding: 15px;
+        border: 1px solid #eee;
+        margin-bottom: 10px;
+        border-radius: 5px;
+    }
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .btn-submit {
+        background-color: #007bff;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

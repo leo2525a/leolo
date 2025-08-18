@@ -1,0 +1,81 @@
+{% extends 'core/base.html' %}
+
+{% block title %}出勤打卡{% endblock %}
+
+{% block content %}
+<h1>出勤打卡</h1>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="clock-card">
+    <h3>現在時間: <span id="current-time"></span></h3>
+    <p>
+        您的狀態: 
+        {% if last_record %}
+            <strong class="status-in">已上班</strong> (於 {{ last_record.clock_in|date:"H:i:s" }})
+        {% else %}
+            <strong class="status-out">已下班</strong>
+        {% endif %}
+    </p>
+    
+    <form action="{% url 'core:clock_in_out' %}" method="post">
+        {% csrf_token %}
+        {% if last_record %}
+            <button type="submit" class="btn-clock-out">下班打卡 (Clock Out)</button>
+        {% else %}
+            <button type="submit" class="btn-clock-in">上班打卡 (Clock In)</button>
+        {% endif %}
+    </form>
+</div>
+
+<h2 style="margin-top: 30px;">今日打卡記錄</h2>
+<table class="record-table">
+    <thead>
+        <tr>
+            <th>上班時間</th>
+            <th>下班時間</th>
+            <th>備註</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for record in todays_records %}
+        <tr>
+            <td>{{ record.clock_in|date:"Y-m-d H:i:s" }}</td>
+            <td>{{ record.clock_out|date:"Y-m-d H:i:s"|default:"--" }}</td>
+            <td>{% if record.is_manual_entry %}{{ record.notes }}{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">今日尚無打卡記錄。</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+    function updateTime() {
+        // toLocaleTimeString() 會使用您瀏覽器的地區設定來顯示時間
+        document.getElementById('current-time').innerText = new Date().toLocaleTimeString();
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .clock-card { text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px; }
+    .btn-clock-in, .btn-clock-out { font-size: 1.5rem; padding: 15px 30px; border-radius: 8px; border: none; color: white; cursor: pointer; }
+    .btn-clock-in { background-color: #28a745; }
+    .btn-clock-out { background-color: #dc3545; }
+    .status-in { color: #28a745; }
+    .status-out { color: #6c757d; }
+    .record-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+    .record-table th, .record-table td { border: 1px solid #ddd; padding: 8px; }
+    .alert { /* ...之前的 alert 樣式... */ }
+</style>
+{% endblock %}

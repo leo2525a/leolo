@@ -1,0 +1,37 @@
+{% extends 'core/base.html' %}
+
+{% block title %}我的入職任務{% endblock %}
+
+{% block content %}
+<h1>我的入職任務</h1>
+<p>歡迎加入！請依照以下清單完成您的入職流程。</p>
+
+<ul class="task-list">
+    {% for task in tasks %}
+        <li class="task-item {% if task.is_completed %}completed{% endif %}">
+            <a href="{% url 'core:complete_task' task.id %}" class="task-checkbox">
+                {% if task.is_completed %}✔{% else %}☐{% endif %}
+            </a>
+            <span>{{ task.task_description }}</span>
+        </li>
+    {% empty %}
+        <p>目前沒有指派給您的入職任務。</p>
+    {% endfor %}
+</ul>
+
+{% if all_completed and tasks %}
+    <div class="completion-message">
+        🎉 恭喜您！已完成所有入職任務！
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .task-list { list-style-type: none; padding-left: 0; }
+    .task-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee; }
+    .task-item.completed span { text-decoration: line-through; color: #aaa; }
+    .task-checkbox { font-size: 1.5rem; text-decoration: none; color: #007bff; margin-right: 15px; }
+    .completion-message { margin-top: 20px; padding: 20px; background-color: #d4edda; border-radius: 8px; text-align: center; font-size: 1.2rem; }
+</style>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends 'core/base.html' %}
+
+{% block title %}報告中心{% endblock %}
+
+{% block content %}
+<h1>報告中心</h1>
+<p>在這裡可以生成並下載各種人事報告。</p>
+
+<div class="report-card">
+    <h3>員工名冊報告</h3>
+    <p>根據部門和在職狀態篩選，並匯出完整的員工名冊 Excel 檔案。</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="department">選擇部門</label>
+                <select name="department" class="form-control">
+                    <option value="">所有部門</option>
+                    {% for dept in departments %}
+                        <option value="{{ dept.id }}">{{ dept.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="status">選擇在職狀態</label>
+                <select name="status" class="form-control">
+                    <option value="">所有狀態</option>
+                    <option value="Active">在職 (Active)</option>
+                    <option value="Inactive">離職 (Inactive)</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit">匯出 Excel 報告</button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-card {
+        background-color: #fff;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        margin-top: 20px;
+    }
+    .form-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    .form-group {
+        flex: 1;
+    }
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+    .btn-submit {
+        background-color: #17a2b8; /* 青色 */
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
