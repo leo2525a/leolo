@@ -1,0 +1,28 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Generate Tax Report (IR56B){% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Generate Employer's Return (IR56B)</h2>
+    <p class="text-muted">Select an employee and the tax year to generate the IR56B form.</p>
+    <hr>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="{{ form.employee.id_for_label }}" class="form-label">{{ form.employee.label }}</label>
+                    {{ form.employee }}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.tax_year.id_for_label }}" class="form-label">{{ form.tax_year.label }}</label>
+                    {{ form.tax_year }}
+                    <div class="form-text">{{ form.tax_year.help_text }}</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Generate PDF</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

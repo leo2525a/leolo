@@ -1,79 +1,167 @@
 {% extends 'core/base.html' %}
 {% load custom_filters %}
 
-{% block title %}團隊月表{% endblock %}
+{% block title %}團隊排班表 - {{ target_date|date:"Y年 n月" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 所有 CSS 樣式都和上一版相同，保持不變 */
+    .calendar-container { max-width: 1400px; margin: 0 auto; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .calendar-table th, .calendar-table td { border: 1px solid #ddd; vertical-align: top; height: 120px; padding: 5px; }
+    .calendar-table th { text-align: center; background-color: #f8f9fa; }
+    .day-cell { position: relative; cursor: pointer; transition: background-color 0.2s; }
+    .day-cell:not(.other-month):hover { background-color: #e9ecef; }
+    .day-number { font-weight: bold; }
+    .day-cell.today .day-number { background-color: #007bff; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+    .day-cell.other-month { background-color: #f5f5f5; color: #ccc; cursor: default; }
+    .holiday-name { font-weight: bold; color: #dc3545; }
+    .employee-list, .department-summary { list-style-type: none; padding: 0; margin-top: 5px; font-size: 0.8rem; }
+    .employee-list { overflow-y: auto; max-height: 80px; }
+    .employee-tag { display: block; padding: 2px 6px; border-radius: 4px; color: white; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .department-summary { display: none; }
+    .department-summary-item { display: flex; align-items: center; margin-bottom: 3px; }
+    .dept-color-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1050; }
+    .modal-window { background: white; padding: 25px; border-radius: 8px; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-bottom: 15px; margin-bottom: 15px; }
+    .modal-title { font-size: 1.25rem; margin: 0; }
+    .modal-close-btn { border: none; background: none; font-size: 1.5rem; cursor: pointer; }
+    .modal-body { overflow-y: auto; }
+    .modal-employee-list { list-style-type: none; padding: 0; }
+    .modal-employee-list li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="schedule-header">
-    <a href="{% url 'core:team_schedule' prev_month.year prev_month.month %}">❮ 上個月</a>
-    <h1>{{ target_date|date:"Y 年 n 月" }}</h1>
-    <a href="{% url 'core:team_schedule' next_month.year next_month.month %}">下個月 ❯</a>
-</div>
+<div class="calendar-container">
+    <div class="calendar-header">
+        <a href="{% url 'core:team_schedule' year=prev_month.year month=prev_month.month %}" class="btn btn-outline-secondary">‹ 上個月</a>
+        <h2>{{ target_date|date:"Y年 n月" }}</h2>
+        <a href="{% url 'core:team_schedule' year=next_month.year month=next_month.month %}" class="btn btn-outline-secondary">下個月 ›</a>
+    </div>
 
-<div class="table-responsive" style="margin-top: 20px;">
-    <table class="schedule-table">
+    <table class="calendar-table">
         <thead>
             <tr>
-                <th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th>
+                <th>星期日</th><th>星期一</th><th>星期二</th><th>星期三</th><th>星期四</th><th>星期五</th><th>星期六</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="calendar-body">
             {% for week in month_days %}
-                <tr>
-                    {% for day in week %}
-                        <td class="{% if day.month != target_date.month %}noday{% endif %}">
-                            <div class="day-header">
-                                <span class="day-number">{{ day.day }}</span>
-                                {% with holiday=public_holidays_map|get_item:day %}
-                                    {% if holiday %}
-                                        <span class="status-badge holiday">{{ holiday }}</span>
-                                    {% endif %}
-                                {% endwith %}
-                            </div>
-                            <div class="day-content">
-                                {% if not holiday %}
-                                    {% for emp in active_employees %}
-                                        {% with status_info=schedule_map|get_item:emp.id|get_item:day %}
-                                            {% if status_info %}
-                                                <div class="employee-status status-{{ status_info.status|slugify }}">
-                                                    <strong>{{ emp.user.first_name }}:</strong> {{ status_info.details }}
-                                                </div>
-                                            {% else %}
-                                                {% with rule=emp.work_schedule_rules|get_item:day.weekday %}
-                                                    {% if rule %}
-                                                        <div class="employee-status status-on-duty">
-                                                            <strong>{{ emp.user.first_name }}:</strong> {{ rule.start_time|date:"H:i" }}-{{ rule.end_time|date:"H:i" }}
-                                                        </div>
-                                                    {% endif %}
-                                                {% endwith %}
-                                            {% endif %}
-                                        {% endwith %}
+            <tr>
+                {% for day in week %}
+                {% with day_data=schedule_data|get_item:day %}
+                    <td class="day-cell {% if day.month != target_date.month %}other-month{% endif %} {% if day == today %}today{% endif %}"
+                        data-date="{{ day|date:'Y-m-d' }}">
+                        <div class="day-number">{{ day.day }}</div>
+                        
+                        {% if day_data and day.month == target_date.month %}
+                            {% if day_data.is_holiday %}
+                                <span class="holiday-name">{{ day_data.holiday_name }}</span>
+                            {% else %}
+                                <ul class="employee-list">
+                                    {% for emp in day_data.employees %}
+                                        <li><span class="employee-tag" style="background-color: {{ emp.department_color }};">{{ emp.full_name }}</span></li>
                                     {% endfor %}
-                                {% endif %}
-                            </div>
-                        </td>
-                    {% endfor %}
-                </tr>
+                                </ul>
+                                <ul class="department-summary">
+                                    {% for summary in day_data.summary %}
+                                    <li class="department-summary-item">
+                                        <span class="dept-color-dot" style="background-color: {{ summary.color }};"></span>
+                                        {{ summary.name }}: {{ summary.count }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<div class="modal-overlay" id="schedule-modal">
+    <div class="modal-window">
+        <div class="modal-header">
+            <h5 class="modal-title" id="modal-title">上班人員</h5>
+            <button type="button" class="modal-close-btn" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+    </div>
+</div>
+
+<script id="schedule-json-data" type="application/json">
+    {{ schedule_data|jsonify|safe }}
+</script>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-    .schedule-header { display: flex; justify-content: space-between; align-items: center; }
-    .schedule-table { table-layout: fixed; width: 100%; border-collapse: collapse; }
-    .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; vertical-align: top; height: 120px; }
-    .schedule-table th { padding: 8px; text-align: center; background-color: #f8f9fa; }
-    .day-header { padding: 5px; text-align: right; }
-    .day-header .day-number { font-weight: bold; }
-    .day-header .holiday { display: block; background-color: #cce5ff; color: #004085; font-size: 0.8em; padding: 2px 4px; border-radius: 4px; margin-top: 5px; }
-    .day-content { padding: 5px; }
-    .noday { background-color: #f9f9f9; color: #ccc; }
-    .employee-status { font-size: 0.8em; padding: 2px 4px; border-radius: 3px; margin-bottom: 3px; }
-    .status-on-duty { background-color: #e9ecef; }
-    .status-approved { background-color: #f8d7da; color: #721c24; } /* 已批准休假 */
-    .status-pending { background-color: #fff3cd; color: #856404; } /* 待審核休假 */
-</style>
+{% block extra_js %}
+<script>
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 這個 try-catch 區塊可以捕捉並報告任何在執行中發生的錯誤
+    try {
+        console.log("腳本啟動：DOMContentLoaded 事件已觸發。");
+
+        const SUMMARY_THRESHOLD = 3;
+        const jsonDataElement = document.getElementById('schedule-json-data');
+        const scheduleData = JSON.parse(jsonDataElement.textContent);
+        
+        document.querySelectorAll('.day-cell .employee-list').forEach(list => {
+            if (list.children.length > SUMMARY_THRESHOLD) {
+                list.style.display = 'none';
+                list.nextElementSibling.style.display = 'block';
+            }
+        });
+
+        const modal = document.getElementById('schedule-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const closeModalBtn = document.getElementById('modal-close');
+
+        const closeModal = () => modal.style.display = 'none';
+        closeModalBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) closeModal();
+        });
+
+        const calendarBody = document.getElementById('calendar-body');
+        calendarBody.addEventListener('click', function(event) {
+            const cell = event.target.closest('.day-cell');
+            if (!cell || cell.classList.contains('other-month')) return;
+
+            const dateStr = cell.dataset.date;
+            const dayData = scheduleData[dateStr];
+            if (!dayData) return;
+
+            if (dayData.employees && dayData.employees.length > 0) {
+                modalTitle.textContent = `${dateStr} 上班人員 (${dayData.employees.length}人)`;
+                modalBody.innerHTML = '';
+                const list = document.createElement('ul');
+                list.className = 'modal-employee-list';
+                dayData.employees.forEach(emp => {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<span class="dept-color-dot" style="background-color: ${emp.department_color};"></span><strong>${emp.full_name}</strong> (${emp.department_name})`;
+                    list.appendChild(listItem);
+                });
+                modalBody.appendChild(list);
+            } else {
+                modalTitle.textContent = `${dateStr} 無上班人員`;
+                modalBody.innerHTML = `<p>${dayData.is_holiday ? `國定假日 (${dayData.holiday_name})` : '當天為休息日或無排班人員。'}</p>`;
+            }
+            modal.style.display = 'flex';
+        });
+        console.log("事件委派監聽器已成功附加。");
+
+    } catch (error) {
+        console.error("執行日曆腳本時發生致命錯誤:", error);
+    }
+});
+</script>
 {% endblock %}

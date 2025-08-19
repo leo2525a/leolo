@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>IR56B - {{ employee.user.get_full_name }} - {{ tax_year_end|add:"-1" }}/{{ tax_year_end }}</title>
+    <style>
+        @page { size: A4; margin: 1cm; }
+        body {
+            font-family: "MS PMincho", "MingLiU", serif; /* 使用更接近官方表格的中文字體 */
+            font-size: 9pt;
+            line-height: 1.4;
+        }
+        .form-container {
+            width: 100%;
+            border: 2px solid black;
+            padding: 10px;
+        }
+        .header-box {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .header-box .main-title {
+            font-size: 14pt;
+            font-weight: bold;
+        }
+        .header-box .subtitle {
+            font-size: 10pt;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5px;
+        }
+        .info-table td {
+            border: 1px solid black;
+            padding: 4px;
+            vertical-align: top;
+        }
+        .label {
+            font-size: 8pt;
+        }
+        .data-field {
+            font-family: "Courier New", monospace;
+            font-size: 10pt;
+            min-height: 14px;
+            display: block;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 11pt;
+            margin: 10px 0 5px 0;
+            text-align: center;
+        }
+        .income-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .income-table td {
+            border: 1px solid black;
+            padding: 4px;
+        }
+        .income-item {
+            display: flex;
+            justify-content: space-between;
+        }
+        .income-item .desc {
+            flex-grow: 1;
+        }
+        .income-item .amount {
+            font-family: "Courier New", monospace;
+            text-align: right;
+            min-width: 100px;
+        }
+        .total-row {
+            font-weight: bold;
+        }
+        .signature-box {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="header-box">
+            <div class="main-title">僱主填報的薪酬及退休金報稅表</div>
+            <div class="subtitle">截至 {{ tax_year_end }} 年 3 月 31 日止的 1 年度內</div>
+        </div>
+
+        <table class="info-table">
+            <tr>
+                <td style="width: 50%;"><span class="label">1. 僱主檔案號碼</span><div class="data-field">{{ employer_file_number }}&nbsp;</div></td>
+                <td style="width: 50%;"><span class="label">僱主名稱</span><div class="data-field">{{ company_name }}&nbsp;</div></td>
+            </tr>
+            <tr>
+                <td colspan="2"><span class="label">2. 僱員姓名</span><div class="data-field">{{ employee.user.last_name }} {{ employee.user.first_name }}</div></td>
+            </tr>
+            <tr>
+                <td><span class="label">3. (a) 香港身分證號碼</span><div class="data-field">{{ employee.employee_number }}&nbsp;</div></td>
+                <td><span class="label">4. 性別 (M=男性, F=女性)</span><div class="data-field">{{ employee.gender|slice:":1" }}&nbsp;</div></td>
+            </tr>
+            <tr>
+                <td><span class="label">5. 婚姻狀況 (1=未婚等, 2=已婚)</span><div class="data-field">{{ employee.marital_status|slice:":1" }}&nbsp;</div></td>
+                <td><span class="label">6. (a) 配偶姓名</span><div class="data-field">{{ employee.spouse_name|default:"&nbsp;" }}</div></td>
+            </tr>
+            <tr>
+                <td colspan="2"><span class="label">7. 住址</span><div class="data-field">{{ employee.residential_address }}&nbsp;</div></td>
+            </tr>
+            <tr>
+                <td colspan="2"><span class="label">9. 受僱職位</span><div class="data-field">{{ employee.position.title }}&nbsp;</div></td>
+            </tr>
+             <tr>
+                <td colspan="2"><span class="label">10. 是年內的僱用期間</span><div class="data-field">{{ period_of_employment }}</div></td>
+            </tr>
+        </table>
+        
+        <div class="section-title">入息</div>
+        <table class="income-table">
+            <tr>
+                <td style="width: 80%;"><div class="income-item"><span class="desc">11. (a) 薪金 / 工資</span> <span class="amount">{{ income.salary|floatformat:2 }}</span></div></td>
+                <td style="width: 20%;" rowspan="9"></td>
+            </tr>
+            <tr>
+                <td><div class="income-item"><span class="desc">(b) 假期薪酬</span> <span class="amount">{{ income.leave_pay|floatformat:2 }}</span></div></td>
+            </tr>
+             <tr>
+                <td><div class="income-item"><span class="desc">(c) 佣金 / 花紅</span> <span class="amount">{{ income.bonus|floatformat:2 }}</span></div></td>
+            </tr>
+             <tr>
+                <td><div class="income-item"><span class="desc">(d) 代通知金</span> <span class="amount">{{ income.lieu_of_notice|floatformat:2 }}</span></div></td>
+            </tr>
+            <tr>
+                <td><div class="income-item"><span class="desc">(e) 約滿酬金</span> <span class="amount">{{ income.gratuity|floatformat:2 }}</span></div></td>
+            </tr>
+            <tr>
+                <td><div class="income-item"><span class="desc">(f) 其他報酬、津貼 (非現金)</span> <span class="amount">{{ income.other_allowances|floatformat:2 }}</span></div></td>
+            </tr>
+             <tr class="total-row">
+                <td><div class="income-item"><span class="desc" style="text-align: right; padding-right: 10px;">總計 (HK$)</span> <span class="amount">{{ income.total_income|floatformat:2 }}</span></div></td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

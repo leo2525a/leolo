@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HRM System{% endblock %}</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0; 
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+        .navbar {
+            background-color: #ffffff;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,.05);
+        }
+        .navbar a {
+            text-decoration: none;
+            color: #495057;
+            font-weight: 500;
+            margin-left: 1.5rem;
+        }
+        .navbar .brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #007bff;
+            margin-left: 0;
+        }
+        .navbar .user-info {
+            color: #6c757d;
+        }
+        .container {
+            max-width: 960px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .link-button {
+            background: none; border: none; color: #007bff; text-decoration: none; cursor: pointer;
+            padding: 0; font-size: inherit; font-family: inherit; font-weight: 500;
+        }
+        .link-button:hover { text-decoration: underline; }
+        /* 沿用之前的 alert 樣式 */
+        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 4px; }
+        .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div>
+            <a href="{% url 'core:profile' %}" class="brand">TalentCore</a>
+        </div>
+        <div>
+            {% if user.is_authenticated %}
+                <span class="user-info">Welcome, {{ user.first_name }}!</span>
+                <a href="{% url 'core:profile' %}">個人資料</a>
+                <a href="{% url 'core:attendance' %}">出勤打卡</a> 
+                <a href="{% url 'core:leave_apply' %}">申請休假</a>
+                <a href="{% url 'core:employee_directory' %}">員工目錄</a>
+                <a href="{% url 'core:team_schedule_current' %}">團隊月表</a> 
+                <a href="{% url 'core:my_reviews' %}">我的評估</a>
+                <a href="{% url 'core:job_board' %}">招聘職位</a>
+                <a href="{% url 'core:onboarding' %}">入職任務</a>
+                <a href="{% url 'core:overtime_apply' %}">申請加班</a> <a href="{% url 'core:employee_directory' %}">員工目錄</a>
+                {% if user.employee.manager_of.exists %}
+                <a href="{% url 'core:manager_dashboard' %}">團隊管理</a>
+                <a href="{% url 'core:analytics' %}">分析儀表板</a>
+                {% endif %}
+
+                {% if user.is_staff %}
+                    <a href="{% url 'core:reporting' %}">報告中心</a>
+                {% endif %}
+
+                <form method="post" action="{% url 'core:logout' %}" style="display: inline; margin-left: 1.5rem;">
+                    {% csrf_token %}
+                    <button type="submit" class="link-button">登出</button>
+                </form>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+</body>
+</html>

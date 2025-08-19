@@ -36,7 +36,7 @@ urlpatterns = [
     path('manager/edit-schedule/', views.edit_team_schedule_view, name='edit_team_schedule'),
     path('internal/jobs/<int:job_id>/pipeline/', views.recruitment_pipeline_view, name='recruitment_pipeline'),
     path('internal/application/<int:app_id>/update-status/', views.update_application_status_view, name='update_application_status'),
-
+    path('reports/tax/', views.tax_report_view, name='tax_report'),
 
 
     # Analytics

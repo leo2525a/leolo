@@ -7,7 +7,7 @@ from .models import (Department, Position, Employee, LeaveType, LeaveRequest,
                      OnboardingChecklist, EmployeeTask, SiteConfiguration, LeavePolicy, 
                      PolicyRule, WorkSchedule, ScheduleRule, DutyShift, ContractTemplate,SalaryHistory,
                      PublicHoliday, LeaveBalanceAdjustment,JobOpening, Candidate, Application
-                     ,PayrollRun, Payslip, PayslipItem, SalaryHistory,PayrollConfiguration) # 確保所有模型都已匯入
+                     ,PayrollRun, Payslip, PayslipItem, SalaryHistory,PayrollConfiguration, LeaveBalance) # 確保所有模型都已匯入
 from django.urls import reverse
 from django.core.files.base import ContentFile
 from django.utils.html import format_html
@@ -235,13 +235,15 @@ class PayslipInline(admin.TabularInline):
         return False
 
 # --- MODEL ADMIN CLASSES ---
-@admin.register(Employee)
+admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
     list_display = ('employee_number', 'user', 'department', 'position', 'status', 'leave_policy','work_schedule')
     list_filter = ('department', 'position', 'status')
     search_fields = ('employee_number', 'user__username', 'user__first_name', 'user__last_name')
     raw_id_fields = ('user', 'manager')
-    inlines = [EmployeeDocumentInline,SalaryHistoryInline]
+
+    # The 'inlines' and 'actions' from your file are preserved
+    inlines = [EmployeeDocumentInline, SalaryHistoryInline]
     actions = [assign_onboarding_checklist, generate_contract_action]
 
 @admin.register(ContractTemplate)
@@ -336,12 +338,12 @@ class SiteConfigurationAdmin(admin.ModelAdmin):
             'fields': ('email_host', 'email_port', 'email_use_tls', 'email_host_user', 'email_host_password')
         }),
         ('公司資訊', {
-            'fields': ('company_logo',)
+            'fields': ('company_logo', 'employer_file_number',) # 👈 加入僱主檔案號碼
         }),
         ('出勤設定', {
             'fields': ('allowed_ip_addresses',)
         }),
-        
+
     )
 
     # 當使用者點擊列表頁時，自動導向到唯一的編輯頁面
@@ -358,6 +360,11 @@ class SiteConfigurationAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'color')
+    # 為了讓顏色選擇更直覺，可以在 Django 後台整合一個顏色選擇器套件
+    # 但最簡單的方式就是直接讓管理者輸入顏色碼
 
 @admin.register(DutyShift)
 class DutyShiftAdmin(admin.ModelAdmin):
@@ -366,13 +373,27 @@ class DutyShiftAdmin(admin.ModelAdmin):
 
 @admin.register(LeavePolicy)
 class LeavePolicyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description')
+    list_display = ('name', 'accrual_frequency', 'accrual_amount', 'accrual_unit', 'enable_holiday_compensation') # 啟用節假日補償
     inlines = [PolicyRuleInline]
+    
+    # 透過 fieldsets 來美化編輯頁面的排版
     fieldsets = (
-        ('基本資訊', {'fields': ('name', 'description')}),
-        ('等待期設定', {'fields': ('waiting_period_amount', 'waiting_period_unit')}),
-        ('權責發生制規則 (基礎)', {'fields': ('accrual_frequency', 'accrual_amount', 'accrual_unit')}),
-        ('年度結算規則 (Year-End)', {'fields': ('fiscal_year_start_month', 'allow_carry_over', 'max_carry_over_amount')}),
+        ('基本資訊', {
+            'fields': ('name', 'description')
+        }),
+        ('權責發生設定', {
+            'fields': ('accrual_frequency', 'accrual_amount', 'accrual_unit')
+        }),
+        ('年度結算設定', {
+            'fields': ('fiscal_year_start_month', 'allow_carry_over', 'max_carry_over_amount')
+        }),
+        ('到職等待期', {
+            'fields': ('waiting_period_amount', 'waiting_period_unit')
+        }),
+        # 【↓↓↓ 新增這個區塊 ↓↓↓】
+        ('其他設定', {
+            'fields': ('enable_holiday_compensation',)
+        }),
     )
 
 @admin.register(JobOpening)
@@ -422,10 +443,41 @@ class PayslipAdmin(admin.ModelAdmin):
     list_filter = ('payroll_run',)
     search_fields = ('employee__user__username',)
     inlines = [PayslipItemInline]
-    autocomplete_fields = ['employee']
+    raw_id_fields = ['employee'] # Changed from autocomplete_fields
+
+@admin.register(LeaveBalanceAdjustment)
+class LeaveBalanceAdjustmentAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'leave_type', 'hours_changed', 'reason', 'created_at')
+    list_filter = ('employee', 'leave_type')
+    raw_id_fields = ['employee'] # Changed from autocomplete_fields
+    list_per_page = 20
+    search_fields = ('employee__user__username', 'reason')
+    ordering = ('-created_at',)
+
+    def save_model(self, request, obj, form, change):
+        """
+        當儲存一筆調整記錄時，自動更新對應的 LeaveBalance。
+        """
+        # 使用資料庫交易確保資料一致性
+        with transaction.atomic():
+            # 首先儲存調整記錄物件本身
+            super().save_model(request, obj, form, change)
+
+            # 尋找或建立對應的假期餘額記錄
+            balance, created = LeaveBalance.objects.get_or_create(
+                employee=obj.employee,
+                leave_type=obj.leave_type
+            )
+
+            # 更新餘額
+            balance.balance_hours += obj.hours_changed
+            balance.save()
+
+            # 在後台顯示成功訊息
+            messages.success(request, f"成功為 {obj.employee.user.get_full_name()} 的 {obj.leave_type.name} 調整了 {obj.hours_changed} 小時。新的餘額為 {balance.balance_hours} 小時。")
+
 
 # --- SIMPLE REGISTRATIONS ---
-admin.site.register(Department)
 admin.site.register(Position)
 admin.site.register(LeaveType)
 admin.site.register(LeaveRequest)
@@ -433,5 +485,4 @@ admin.site.register(EmployeeDocument)
 admin.site.register(Goal)
 admin.site.register(EmployeeTask)
 admin.site.register(PublicHoliday)
-admin.site.register(LeaveBalanceAdjustment)
 admin.site.register(SalaryHistory)

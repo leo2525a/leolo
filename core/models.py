@@ -14,6 +14,7 @@ import holidays
 class Department(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name="部門名稱")
     description = models.TextField(blank=True, null=True, verbose_name="部門描述")
+    color = models.CharField(max_length=7, default="#888888", verbose_name="部門顏色", help_text="請輸入十六進位顏色碼，例如 #FF5733")
 
     def __str__(self):
         return self.name
@@ -50,6 +51,8 @@ class LeavePolicy(models.Model):
     description = models.TextField(blank=True, verbose_name="策略描述")
 
     # --- 👇 在下方新增年度結算設定 ---
+    enable_holiday_compensation = models.BooleanField(default=True, verbose_name="啟用節假日補償", help_text="如果啟用，當公共假日落在員工的休息日時，系統將自動補償假期。")
+
     fiscal_year_start_month = models.IntegerField(
         choices=MONTH_CHOICES, 
         default=1, 
@@ -139,6 +142,11 @@ class Employee(models.Model):
     employee_number = models.CharField(max_length=50, unique=True, verbose_name="員工編號")
     phone_number = models.CharField(max_length=50, blank=True, verbose_name="電話")
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True, verbose_name="性別")
+    marital_status = models.CharField(max_length=20, blank=True, verbose_name="婚姻狀況", help_text="例如：單身、已婚")
+    spouse_name = models.CharField(max_length=255, blank=True, verbose_name="配偶姓名")
+    spouse_id_number = models.CharField(max_length=50, blank=True, verbose_name="配偶身分證號碼")
+    residential_address = models.TextField(blank=True, verbose_name="住址")
+    correspondence_address = models.TextField(blank=True, verbose_name="通訊地址(如不同)")
     hire_date = models.DateField(verbose_name="入職日期")
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所屬部門")
     position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="擔任職位")
@@ -347,6 +355,7 @@ class SiteConfiguration(models.Model):
     email_use_tls = models.BooleanField(default=True, verbose_name="使用 TLS")
     email_host_user = models.EmailField(blank=True, verbose_name="發信人 Email")
     email_host_password = models.CharField(max_length=255, blank=True, verbose_name="發信人密碼 (應用程式密碼)")
+    company_name = models.CharField(max_length=255, blank=True, verbose_name="公司名稱")
     company_logo = models.ImageField(upload_to='logos/', blank=True, null=True, verbose_name="公司 Logo")
 
     allowed_ip_addresses = models.TextField(
@@ -354,6 +363,8 @@ class SiteConfiguration(models.Model):
         verbose_name="公司允許的 IP 位址",
         help_text="請輸入公司允許打卡的 IP 位址，多個位址請用逗號分隔 (例如: 192.168.1.100, 203.0.113.5)"
     )
+
+    employer_file_number = models.CharField(max_length=50, blank=True, verbose_name="僱主檔案號碼 (Employer's File No.)")
 
     def __str__(self):
         return "系統組態"
@@ -412,14 +423,17 @@ class PublicHoliday(models.Model):
         return f"{self.date}: {self.name}"
 
 # core/models.py
+
 class LeaveBalanceAdjustment(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    hours_changed = models.DecimalField(max_digits=5, decimal_places=2)
-    reason = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="員工")
+    leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE, verbose_name="假期類型")
+    hours_changed = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="調整時數", help_text="輸入正數以增加時數，負數以減少。")
+    reason = models.CharField(max_length=255, verbose_name="調整原因")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
 
     def __str__(self):
-        return f"{self.employee}: {self.hours_changed} hours for {self.reason}"
+        return f"{self.employee}: {self.hours_changed} 小時 ({self.leave_type.name}) - {self.reason}"
+
 
 class ContractTemplate(models.Model):
     name = models.CharField(max_length=255, verbose_name="樣板名稱")

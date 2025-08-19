@@ -1,7 +1,8 @@
 # core/forms.py
 
 from django import forms
-from .models import LeaveRequest,OvertimeRequest,Candidate
+from .models import LeaveRequest,OvertimeRequest,Candidate, Employee
+from datetime import date
 
 class LeaveRequestForm(forms.ModelForm):
     class Meta:
@@ -38,3 +39,16 @@ class CandidateApplicationForm(forms.ModelForm):
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'resume': forms.FileInput(attrs={'class': 'form-control'}),
         }
+
+class TaxReportForm(forms.Form):
+    employee = forms.ModelChoiceField(
+        queryset=Employee.objects.filter(status='Active'),
+        label="選擇員工",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    tax_year = forms.IntegerField(
+        label="稅務年度 (開始年份)",
+        initial=date.today().year - 1, # Default to the previous year
+        help_text="請輸入課稅年度的開始年份，例如 2024 代表 2024/25 年度。",
+        widget=forms.NumberInput(attrs={'class': 'form-control'})
+    )

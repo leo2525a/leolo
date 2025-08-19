@@ -9,14 +9,14 @@ from django.forms import modelformset_factory
 from .models import (Employee, LeaveRequest, LeaveType, 
                      EmployeeDocument, ReviewCycle, PerformanceReview, Goal, Announcement,
                      OnboardingChecklist, EmployeeTask, SiteConfiguration, Department,Employee, OvertimeRequest, DutyShift, PublicHoliday,
-                     JobOpening, Candidate, Application, AttendanceRecord) # <-- Make sure Department is in this list
-from .forms import LeaveRequestForm, OvertimeRequestForm,CandidateApplicationForm
+                     JobOpening, Candidate, Application, AttendanceRecord, PayslipItem) # <-- Make sure Department is in this list
+from .forms import LeaveRequestForm, OvertimeRequestForm,CandidateApplicationForm, TaxReportForm
 from django.core.mail import send_mail, get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
 import calendar
 import pandas as pd # 👈 1. 在頂部新增
-from django.db.models import Count # 👈 1. 在頂部新增
+from django.db.models import Count, Sum, Q # 👈 1. 在頂部新增
 from django.http import JsonResponse, HttpResponse # 
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
@@ -24,22 +24,40 @@ from django.contrib.auth.decorators import user_passes_test
 from django.utils import timezone
 import json
 import holidays
-
-
-
+from weasyprint import HTML
+from decimal import Decimal
+import os # 👈 2. 匯入 os 模組
+from django.conf import settings # 👈 3. 匯入 settings
+from docx import Document
+import io
+from pypdf import PdfReader, PdfWriter
 
 @login_required
 def profile_view(request):
+    # 初始化所有將在 context 中使用的變數
+    leave_balances_data = []
+    leave_requests = []
+    total_entitlement_hours = 0
+    used_leave_hours = 0
+    remaining_hours = 0
+    employee = None
+    current_salary = None
+
     try:
         employee = Employee.objects.get(user=request.user)
+        
+        # 【修正 #1】在成功路徑中查詢最新的5筆休假申請
+        leave_requests = LeaveRequest.objects.filter(employee=employee).order_by('-start_datetime')[:5]
+        
         balances = employee.leave_balances.all().select_related('leave_type')
 
         for balance in balances:
+            # 【修正 #2】使用正確的 Sum 函式來計算已使用的時數
             used_hours = LeaveRequest.objects.filter(
                 employee=employee,
                 leave_type=balance.leave_type,
                 status='Approved'
-            ).aggregate(total=models.Sum('duration_hours'))['total'] or 0
+            ).aggregate(total=Sum('duration_hours'))['total'] or 0
 
             leave_balances_data.append({
                 'name': balance.leave_type.name,
@@ -51,10 +69,8 @@ def profile_view(request):
         current_salary = employee.get_current_salary()
 
     except (Employee.DoesNotExist, LeaveType.DoesNotExist):
-        employee = None
-        leave_requests = []
-        total_entitlement_hours, used_leave_hours, remaining_hours = 0, 0, 0
-        current_salary = None
+        messages.error(request, "無法檢索員工個人資料。")
+        # 發生錯誤時，變數將保留其初始值
 
     latest_announcements = Announcement.objects.filter(is_published=True)[:3]
 
@@ -66,10 +82,9 @@ def profile_view(request):
         'remaining_hours': remaining_hours,
         'latest_announcements': latest_announcements,
         'current_salary': current_salary,
-        'leave_balances_data': leave_balances_data, # 傳遞新的數據結構
+        'leave_balances_data': leave_balances_data,
     }
-    return render(request, 'core/profile.html', context)    
-
+    return render(request, 'core/profile.html', context)
 
 # core/views.py
 
@@ -478,7 +493,7 @@ def reporting_view(request):
 
 @login_required
 def team_schedule_view(request, year=None, month=None):
-    # 1. Date handling
+    # 1. 日期處理
     if year is None or month is None:
         target_date = date.today()
     else:
@@ -487,62 +502,101 @@ def team_schedule_view(request, year=None, month=None):
     prev_month = target_date - relativedelta(months=1)
     next_month = target_date + relativedelta(months=1)
 
-    cal = calendar.Calendar(firstweekday=6)
+    cal = calendar.Calendar(firstweekday=6) # 星期日為第一天
     month_days = cal.monthdatescalendar(target_date.year, target_date.month)
 
-    first_day_of_month = month_days[0][0]
-    last_day_of_month = month_days[-1][-1]
+    first_day_of_calendar = month_days[0][0]
+    last_day_of_calendar = month_days[-1][-1]
 
-    # 2. Fetch all relevant data
-    active_employees = Employee.objects.filter(status='Active').select_related('user', 'work_schedule')
-    
+    # 2. 一次性高效抓取所有需要的資料
+    departments = Department.objects.all()
+    department_map = {
+        dept.id: {'name': dept.name, 'color': dept.color} 
+        for dept in departments
+    }
+    department_map[None] = {'name': '其他', 'color': '#A9A9A9'}
+
+    # 使用 prefetch_related 一次性抓取所有員工及其關聯的班表規則
+    active_employees = Employee.objects.filter(status='Active').select_related(
+        'user', 'department'
+    ).prefetch_related('work_schedule__rules')
+
+    # 為每位員工預先建立好他們的工作日字典 {員工ID: {0, 1, 2, 3, 4}} (0=週一)
+    employee_workdays_map = {}
     for emp in active_employees:
-        emp.work_schedule_rules = {rule.day_of_week: rule for rule in emp.work_schedule.rules.all()} if emp.work_schedule else {}
+        if emp.work_schedule:
+            employee_workdays_map[emp.id] = {rule.day_of_week for rule in emp.work_schedule.rules.all()}
+        else:
+            employee_workdays_map[emp.id] = set()
 
-    all_leaves = LeaveRequest.objects.filter(
-        employee__in=active_employees,
-        start_datetime__date__lte=last_day_of_month,
-        end_datetime__date__gte=first_day_of_month
-    ).select_related('employee', 'leave_type')
-
-    shifts = DutyShift.objects.filter(date__range=[first_day_of_month, last_day_of_month])
+    # 抓取日曆範圍內所有已批准的休假
+    approved_leaves = LeaveRequest.objects.filter(
+        status='Approved',
+        start_datetime__date__lte=last_day_of_calendar,
+        end_datetime__date__gte=first_day_of_calendar
+    ).values_list('employee_id', 'start_datetime', 'end_datetime')
     
-    # --- This is the new, corrected public holiday logic ---
-    public_holidays = PublicHoliday.objects.filter(
-        date__range=[first_day_of_month, last_day_of_month]
-    )
+    leave_dates_map = {}
+    for emp_id, start_dt, end_dt in approved_leaves:
+        current_date = start_dt.date()
+        while current_date <= end_dt.date():
+            leave_dates_map.setdefault(emp_id, set()).add(current_date)
+            current_date += timedelta(days=1)
+
+    # 抓取日曆範圍內所有國定假日
+    public_holidays = PublicHoliday.objects.filter(date__range=[first_day_of_calendar, last_day_of_calendar])
     public_holidays_map = {h.date: h.name for h in public_holidays}
-    # --- End of new logic ---
 
-    # 3. Pre-process data into fast-lookup dictionaries
-    schedule_map = {}
-    for emp in active_employees:
-        schedule_map[emp.id] = {}
-        
-        for leave in all_leaves:
-            if leave.employee_id == emp.id:
-                current_date = leave.start_datetime.date()
-                while current_date <= leave.end_datetime.date():
-                    if first_day_of_month <= current_date <= last_day_of_month:
-                        status_text = f"休假 ({leave.leave_type.name})" if leave.status == 'Approved' else f"申請中 ({leave.leave_type.name})"
-                        schedule_map[emp.id][current_date] = {'status': leave.status, 'details': status_text}
-                    current_date += timedelta(days=1)
-        
-        for shift in shifts:
-            if shift.employee_id == emp.id:
-                schedule_map[emp.id][shift.date] = {'status': 'On Duty', 'details': f"{shift.start_time.strftime('%H:%M')}-{shift.end_time.strftime('%H:%M')}"}
+
+    # 3. 產生每一天的排班數據
+    schedule_data = {}
+
+    for week in month_days:
+        for day in week:
+            is_holiday = day in public_holidays_map
+            schedule_data[day] = {
+                'employees': [],
+                'summary': {},
+                'is_holiday': is_holiday,
+                'holiday_name': public_holidays_map.get(day)
+            }
+            
+            if is_holiday:
+                continue
+
+            department_counts = {}
+            
+            for emp in active_employees:
+                is_on_leave = emp.id in leave_dates_map and day in leave_dates_map.get(emp.id, set())
+                if is_on_leave:
+                    continue
+
+                if day.weekday() in employee_workdays_map.get(emp.id, set()):
+                    schedule_data[day]['employees'].append({
+                        'full_name': emp.user.get_full_name() or emp.user.username,
+                        'department_name': department_map.get(emp.department_id, department_map[None])['name'],
+                        'department_color': department_map.get(emp.department_id, department_map[None])['color']
+                    })
+                    department_counts[emp.department_id] = department_counts.get(emp.department_id, 0) + 1
+
+            summary_list = []
+            for dept_id, count in department_counts.items():
+                summary_list.append({
+                    'name': department_map.get(dept_id, department_map[None])['name'],
+                    'color': department_map.get(dept_id, department_map[None])['color'],
+                    'count': count
+                })
+            schedule_data[day]['summary'] = sorted(summary_list, key=lambda x: x['name'])
 
     context = {
         'month_days': month_days,
-        'active_employees': active_employees,
-        'schedule_map': schedule_map,
-        'public_holidays_map': public_holidays_map,
+        'schedule_data': schedule_data,
         'target_date': target_date,
         'prev_month': prev_month,
         'next_month': next_month,
+        'today': date.today()
     }
     return render(request, 'core/team_schedule.html', context)
-
 
 # core/views.py
 
@@ -889,3 +943,128 @@ def update_application_status_view(request, app_id):
         return redirect('core:recruitment_pipeline', job_id=application.job.id)
 
     return redirect('core:job_board')
+
+# core/views.py
+
+from .forms import TaxReportForm
+from django.db.models import Sum, Q
+from decimal import Decimal
+import io
+from pypdf import PdfReader, PdfWriter
+from django.conf import settings
+from django.http import HttpResponse
+
+@login_required
+def tax_report_view(request):
+    if not request.user.is_staff:
+        messages.error(request, "您沒有權限訪問此頁面。")
+        return redirect('core:profile')
+
+    if request.method == 'POST':
+        form = TaxReportForm(request.POST)
+        if form.is_valid():
+            employee = form.cleaned_data['employee']
+            tax_year_start = form.cleaned_data['tax_year']
+            tax_year_end = tax_year_start + 1
+
+            # --- 1. Gather Data (Logic remains the same) ---
+            start_date = date(tax_year_start, 4, 1)
+            end_date = date(tax_year_end, 3, 31)
+            config = SiteConfiguration.load()
+            
+            payslip_items = PayslipItem.objects.filter(
+                payslip__employee=employee, item_type='Earning',
+                payslip__payroll_run__year__gte=tax_year_start,
+                payslip__payroll_run__year__lte=tax_year_end,
+            ).filter(
+                Q(payslip__payroll_run__year=tax_year_start, payslip__payroll_run__month__gte=4) |
+                Q(payslip__payroll_run__year=tax_year_end, payslip__payroll_run__month__lte=3)
+            ).values('description').annotate(total=Sum('amount'))
+
+            income = {
+                'salary': Decimal('0.00'), 'leave_pay': Decimal('0.00'),
+                'bonus': Decimal('0.00'), 'back_pay_etc': Decimal('0.00'),
+                'other_allowances': Decimal('0.00'),
+            }
+            for item in payslip_items:
+                desc = item['description'].lower()
+                total = item['total'] or Decimal('0.00')
+                if 'salary' in desc or '基本薪資' in desc: income['salary'] += total
+                elif 'bonus' in desc or '花紅' in desc or 'commission' in desc: income['bonus'] += total
+                elif 'leave pay' in desc or '假期薪酬' in desc: income['leave_pay'] += total
+                elif 'lieu of notice' in desc or '代通知金' in desc or 'gratuity' in desc or '約滿酬金' in desc:
+                    income['back_pay_etc'] += total
+                else: income['other_allowances'] += total
+            total_income = sum(income.values())
+            
+            emp_start_in_period = max(employee.hire_date, start_date)
+            period_start_str = emp_start_in_period.strftime('%d-%m-%Y')
+            period_end_str = end_date.strftime('%d-%m-%Y')
+
+            # --- 2. Build the data dictionary with CORRECT field names ---
+            template_path = settings.BASE_DIR / 'core' / 'pdf_templates' / 'ir56b_ay.pdf'
+            
+            # The keys are now the exact names you provided
+            data_to_fill = {
+                'Reporting Year': str(tax_year_end),
+                'Employer\'s File Number': config.employer_file_number,
+                'Name of Employer': config.company_name,
+                'Sheet Number': '1',
+                'English Surname': employee.user.last_name,
+                'English Given Name': employee.user.first_name,
+                'HKID Number - Digits': employee.employee_number, # Assumes full HKID is stored here
+                'Indicator - Sex': employee.gender[:1] if employee.gender else '', # M or F
+                'Indicator - Marital Status': '2' if employee.marital_status == '已婚' else '1',
+                'Name of Employee\'s Spouse': employee.spouse_name,
+                'Spouse\'s HKID Number or Passport Details': employee.spouse_id_number,
+                'Residential Address': employee.residential_address,
+                'Postal Address': employee.correspondence_address or employee.residential_address,
+                'Capacity Engaged': employee.position.title if employee.position else '',
+                
+                # Main Employment Period
+                'Start Date': period_start_str,
+                'End Date': period_end_str,
+
+                # Income Details
+                'Amount - Salary / Wages': f"{income['salary']:.2f}",
+                'Amount - Leave Pay': f"{income['leave_pay']:.2f}",
+                'Amount - Bonus': f"{income['bonus']:.2f}",
+                'Amount - Back Pay, Payment in Lieu of Notice, Terminal Awards or Gratuities': f"{income['back_pay_etc']:.2f}",
+                'Amount - Other Rewards, Allowances or Perquisites': f"{income['other_allowances']:.2f}",
+                'Amount - Total Incomes': f"{total_income:.2f}",
+
+                # Signer Details (can be hardcoded or moved to SiteConfiguration later)
+                'Name of Signer': "HR Department",
+                'Designation': "Manager",
+                'Date of Signing': date.today().strftime('%d-%m-%Y'),
+            }
+            
+            # --- 3. Fill and serve the PDF (Logic remains the same) ---
+            try:
+                reader = PdfReader(template_path)
+                writer = PdfWriter()
+                writer.append(reader)
+                
+                writer.update_page_form_field_values(
+                    writer.pages[0], data_to_fill
+                )
+                
+                with io.BytesIO() as bytes_stream:
+                    writer.write(bytes_stream)
+                    bytes_stream.seek(0)
+                    
+                    response = HttpResponse(bytes_stream.read(), content_type='application/pdf')
+                    response['Content-Disposition'] = f'attachment; filename="IR56B_filled_{employee.user.username}_{tax_year_start}.pdf"'
+                    return response
+
+            except FileNotFoundError:
+                messages.error(request, f"Error: PDF template not found at '{template_path}'.")
+                return redirect('core:tax_report')
+            except Exception as e:
+                messages.error(request, f"An unknown error occurred while generating the PDF: {e}")
+                return redirect('core:tax_report')
+
+    else:
+        form = TaxReportForm()
+
+    return render(request, 'core/tax_report_form.html', {'form': form})
