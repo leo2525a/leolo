@@ -8,14 +8,22 @@ from django.db import models
 from decimal import Decimal
 from datetime import timedelta, datetime, date
 from ckeditor.fields import RichTextField
+from django.db import models
+from django.contrib.auth.models import User
 import holidays
 import uuid
 
 class Role(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name='角色名稱')
+    is_manager = models.BooleanField(
+        default=False,
+        verbose_name='管理權限',
+        help_text='勾選此項，則擁有此角色的使用者將能看到「團隊管理」等管理員專屬介面。'
+    )
 
     def __str__(self):
         return self.name
+
 
 class Department(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name="部門名稱")
@@ -195,9 +203,21 @@ class Employee(models.Model):
 
     @property
     def is_manager(self):
-        """檢查此員工是否為任何其他員工的經理"""
-        return self.manager_of.exists()
-        
+        """檢查此員工的角色是否被賦予了管理權限。"""
+        if self.role:
+            return self.role.is_manager
+        return False
+    
+    @property
+    def has_management_access(self):
+        """
+        檢查員工的角色是否具有管理權限。
+        這個名稱與新的 base.html 模板中的權限檢查相符。
+        """
+        if self.role:
+            return self.role.is_manager
+        return False
+
 class SalaryHistory(models.Model):
     CHANGE_REASON_CHOICES = (
         ('New Hire', '新進人員'),

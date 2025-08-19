@@ -280,7 +280,8 @@ class PayslipInline(admin.TabularInline):
 # --- MODEL ADMIN CLASSES ---
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
-    list_display = ('name',)
+    list_display = ('name', 'is_manager')
+    list_editable = ('is_manager',) # 讓您可以在列表頁直接勾選
     search_fields = ('name',)
 
 @admin.register(EmailTemplate)
@@ -322,13 +323,14 @@ class EmployeeAdmin(admin.ModelAdmin):
             'fields': ('residential_address', 'correspondence_address')
         }),
         ('身份資訊', {
-            'fields': ('id_number', 'marital_status', 'spouse_name', 'spouse_id_number')
+            'fields': ('id_number', 'marital_status')
         }),
     )
 
 
     inlines = [EmployeeDocumentInline, SalaryHistoryInline]
     actions = [assign_onboarding_checklist, generate_contract_action]
+
 
 @admin.register(ContractTemplate)
 class ContractTemplateAdmin(admin.ModelAdmin):

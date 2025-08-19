@@ -4,40 +4,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}HRM 系統{% endblock %} - Love 21</title>
+    <title>{% block title %}HRM System{% endblock %}</title>
 
-    <!-- 引入 Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 1. 引入 Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     
-    <!-- 引入 Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- 2. 引入 Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" xintegrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <style>
-        /* --- 全局樣式 --- */
+        /* 整體佈局樣式 */
         body { 
-            background-color: #f0f2f5;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa; /* 淺灰色背景 */
         }
         .wrapper {
             display: flex;
             width: 100%;
             min-height: 100vh;
-            align-items: stretch;
         }
-
-        /* --- 側邊欄樣式 (Sidebar) --- */
+        
+        /* 側邊欄樣式 */
         #sidebar {
+            width: 250px;
             min-width: 250px;
-            max-width: 250px;
-            background: #212529;
-            color: #adb5bd;
+            background: #343a40; /* 深色背景 */
+            color: #fff;
             transition: all 0.3s;
-            display: flex;
-            flex-direction: column;
         }
         #sidebar .sidebar-header {
             padding: 20px;
-            background: #343a40;
+            background: #495057;
             text-align: center;
         }
         #sidebar .sidebar-header h3 {
@@ -46,15 +42,11 @@
         }
         #sidebar ul.components {
             padding: 20px 0;
-            border-bottom: 1px solid #474747;
-            flex-grow: 1;
+            border-bottom: 1px solid #47748b;
         }
         #sidebar ul p {
-            color: #6c757d;
-            padding: 10px 20px;
-            font-weight: bold;
-            font-size: 0.9em;
-            text-transform: uppercase;
+            color: #fff;
+            padding: 10px;
         }
         #sidebar ul li a {
             padding: 10px 20px;
@@ -62,23 +54,37 @@
             display: block;
             color: #adb5bd;
             text-decoration: none;
-            transition: all 0.2s;
+            transition: all 0.3s;
         }
         #sidebar ul li a:hover {
             color: #ffffff;
-            background: #343a40;
+            background: #495057;
         }
-        .logout-form {
+        #sidebar ul li.active > a, a[aria-expanded="true"] {
+            color: #fff;
+            background: #007bff;
+        }
+        #sidebar .logout-form {
             padding: 20px;
         }
+        .link-button {
+            background: none; border: none; color: #adb5bd; text-decoration: none; cursor: pointer;
+            padding: 0; font-size: 1.1em; font-family: inherit; width: 100%; text-align: left;
+        }
+        .link-button:hover { color: #ffffff; }
 
-        /* --- 主要內容區樣式 (Content) --- */
+        /* 主要內容區域樣式 */
         #content {
             width: 100%;
-            padding: 20px 40px;
+            padding: 20px;
+            min-height: 100vh;
             transition: all 0.3s;
         }
+        .navbar-light {
+            background-color: #fff !important;
+        }
     </style>
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -91,7 +97,6 @@
 
             <ul class="list-unstyled components">
                 <p class="ps-3">員工功能</p>
-                <!-- 注意：這裡的連結都使用了 'core:' 的命名空間 -->
                 <li><a href="{% url 'core:profile' %}"><i class="fas fa-user me-2"></i>個人資料</a></li>
                 <li><a href="{% url 'core:attendance' %}"><i class="fas fa-clock me-2"></i>出勤打卡</a></li>
                 <li><a href="{% url 'core:leave_apply' %}"><i class="fas fa-plane-departure me-2"></i>申請休假</a></li>
@@ -102,7 +107,8 @@
                 <li><a href="{% url 'core:onboarding' %}"><i class="fas fa-tasks me-2"></i>入職任務</a></li>
 
                 <!-- 經理與管理員專用功能 -->
-                {% if user.employee_profile.is_manager %}
+                {# 👇 This is the corrected and simplified condition 👇 #}
+                {% if user.is_staff or user.employee_profile.has_management_access %}
                 <p class="ps-3 mt-4">管理功能</p>
                 <li><a href="{% url 'core:manager_dashboard' %}"><i class="fas fa-users-cog me-2"></i>團隊管理</a></li>
                 <li><a href="{% url 'core:analytics' %}"><i class="fas fa-chart-line me-2"></i>分析儀表板</a></li>
@@ -125,9 +131,9 @@
 
         <!-- 右側主要內容 -->
         <div id="content">
-            <nav class="navbar navbar-expand-lg navbar-light bg-white mb-4 rounded shadow-sm">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 rounded">
                 <div class="container-fluid">
-                    <span class="navbar-text fs-5">
+                    <span class="navbar-text">
                         歡迎, {{ user.get_full_name|default:user.username }}!
                     </span>
                 </div>
@@ -149,7 +155,7 @@
     </div>
 
     <!-- Bootstrap 5 JavaScript Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     
     {% block extra_js %}{% endblock %}
 </body>
