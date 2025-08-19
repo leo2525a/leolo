@@ -6,11 +6,11 @@ from django.shortcuts import render, redirect, get_object_or_404 # <-- 在這裡
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.forms import modelformset_factory 
-from .models import (Employee, LeaveRequest, LeaveType, 
+from .models import (Employee, LeaveRequest, LeaveType, LeaveBalance,
                      EmployeeDocument, ReviewCycle, PerformanceReview, Goal, Announcement,
                      OnboardingChecklist, EmployeeTask, SiteConfiguration, Department,Employee, OvertimeRequest, DutyShift, PublicHoliday,
                      JobOpening, Candidate, Application, AttendanceRecord, PayslipItem) # <-- Make sure Department is in this list
-from .forms import LeaveRequestForm, OvertimeRequestForm,CandidateApplicationForm, TaxReportForm
+from .forms import LeaveRequestForm, OvertimeRequestForm,CandidateApplicationForm, TaxReportForm, UserUpdateForm, EmployeeUpdateForm
 from django.core.mail import send_mail, get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -34,57 +34,92 @@ from pypdf import PdfReader, PdfWriter
 
 @login_required
 def profile_view(request):
-    # 初始化所有將在 context 中使用的變數
-    leave_balances_data = []
-    leave_requests = []
-    total_entitlement_hours = 0
-    used_leave_hours = 0
-    remaining_hours = 0
-    employee = None
-    current_salary = None
-
+    """
+    Displays the user's main profile/dashboard if their profile is complete.
+    If not, it redirects them to the profile edit page.
+    """
     try:
-        employee = Employee.objects.get(user=request.user)
-        
-        # 【修正 #1】在成功路徑中查詢最新的5筆休假申請
-        leave_requests = LeaveRequest.objects.filter(employee=employee).order_by('-start_datetime')[:5]
-        
-        balances = employee.leave_balances.all().select_related('leave_type')
+        employee = request.user.employee_profile
+    except Employee.DoesNotExist:
+        messages.error(request, '無法找到您的員工資料。超級使用者請使用管理後台。')
+        return redirect('admin:index')
 
-        for balance in balances:
-            # 【修正 #2】使用正確的 Sum 函式來計算已使用的時數
-            used_hours = LeaveRequest.objects.filter(
-                employee=employee,
-                leave_type=balance.leave_type,
-                status='Approved'
-            ).aggregate(total=Sum('duration_hours'))['total'] or 0
+    # 1. FIRST, check if the profile is complete.
+    if not employee.is_profile_complete():
+        # If incomplete, redirect to the edit page immediately.
+        return redirect('core:profile_edit')
 
-            leave_balances_data.append({
-                'name': balance.leave_type.name,
-                'total': balance.balance_hours,
-                'used': used_hours,
-                'remaining': balance.balance_hours - used_hours
-            })
+    # 2. If the profile IS complete, proceed with your original data gathering.
+    leave_balances_data = []
+    
+    # Fetch leave requests
+    leave_requests = LeaveRequest.objects.filter(employee=employee).order_by('-start_datetime')[:5]
+    
+    # Fetch leave balances
+    balances = employee.leave_balances.all().select_related('leave_type')
+    for balance in balances:
+        used_hours = LeaveRequest.objects.filter(
+            employee=employee,
+            leave_type=balance.leave_type,
+            status='Approved'
+        ).aggregate(total=Sum('duration_hours'))['total'] or 0
 
-        current_salary = employee.get_current_salary()
+        leave_balances_data.append({
+            'name': balance.leave_type.name,
+            'total': balance.balance_hours,
+            'used': used_hours,
+            'remaining': balance.balance_hours - used_hours
+        })
 
-    except (Employee.DoesNotExist, LeaveType.DoesNotExist):
-        messages.error(request, "無法檢索員工個人資料。")
-        # 發生錯誤時，變數將保留其初始值
-
-    latest_announcements = Announcement.objects.filter(is_published=True)[:3]
+    # Fetch other data
+    current_salary = employee.get_current_salary()
+    latest_announcements = Announcement.objects.filter(is_published=True).order_by('-created_at')[:3]
 
     context = {
         'employee': employee,
         'leave_requests': leave_requests,
-        'total_entitlement_hours': total_entitlement_hours,
-        'used_leave_hours': used_leave_hours,
-        'remaining_hours': remaining_hours,
         'latest_announcements': latest_announcements,
         'current_salary': current_salary,
         'leave_balances_data': leave_balances_data,
     }
     return render(request, 'core/profile.html', context)
+
+@login_required
+def profile_edit_view(request):
+    """
+    Handles the form for editing user and employee profile information.
+    """
+    try:
+        employee = request.user.employee_profile
+    except Employee.DoesNotExist:
+        messages.error(request, '無法找到您的員工資料。')
+        return redirect('admin:index')
+
+    if request.method == 'POST':
+        user_form = UserUpdateForm(request.POST, instance=request.user)
+        employee_form = EmployeeUpdateForm(request.POST, instance=employee)
+        if user_form.is_valid() and employee_form.is_valid():
+            user_form.save()
+            employee_form.save()
+            messages.success(request, '您的個人資料已成功更新。')
+            # After saving, redirect back to the main profile view.
+            # The middleware or the view itself will then allow access to the dashboard.
+            return redirect('core:profile')
+        else:
+            messages.error(request, '資料更新失敗，請檢查您輸入的內容。')
+    else:
+        user_form = UserUpdateForm(instance=request.user)
+        employee_form = EmployeeUpdateForm(instance=employee)
+
+    # Add a warning message if the profile is still incomplete
+    if not employee.is_profile_complete():
+        messages.warning(request, '為了啟用所有功能，請您先填寫完整的個人資料。')
+
+    context = {
+        'user_form': user_form,
+        'employee_form': employee_form
+    }
+    return render(request, 'core/profile_edit.html', context)
 
 # core/views.py
 
@@ -1068,3 +1103,65 @@ def tax_report_view(request):
         form = TaxReportForm()
 
     return render(request, 'core/tax_report_form.html', {'form': form})
+
+
+@login_required
+def profile(request):
+    try:
+        employee = request.user.employee_profile
+    except AttributeError:
+        # 如果使用者沒有 employee_profile (例如超級使用者)，可以導向到後台或顯示錯誤訊息
+        messages.error(request, '無法找到您的員工資料。')
+        return redirect('admin:index')
+
+    if request.method == 'POST':
+        user_form = UserUpdateForm(request.POST, instance=request.user)
+        employee_form = EmployeeUpdateForm(request.POST, request.FILES, instance=employee)
+        if user_form.is_valid() and employee_form.is_valid():
+            user_form.save()
+            employee_form.save()
+            messages.success(request, '您的個人資料已成功更新。')
+            # 重新導向回 profile 頁面，以顯示更新後的資料和清除 POST 請求
+            return redirect('profile')
+        else:
+            messages.error(request, '資料更新失敗，請檢查您輸入的內容。')
+
+    else:
+        user_form = UserUpdateForm(instance=request.user)
+        employee_form = EmployeeUpdateForm(instance=employee)
+
+    # 檢查員工資料是否完整，並顯示提示訊息
+    if not employee.is_profile_complete():
+        messages.warning(request, '為了啟用所有功能，請您先填寫完整的個人資料。')
+
+    context = {
+        'user_form': user_form,
+        'employee_form': employee_form
+    }
+    return render(request, 'core/profile.html', context)
+
+def candidate_data_form_view(request, token):
+    # 透過 token 安全地獲取應徵記錄，如果 token 無效則顯示 404
+    application = get_object_or_404(Application, token=token)
+    candidate = application.candidate
+
+    # 如果已經提交過，直接導向感謝頁面
+    if application.personal_data_submitted_at:
+        return render(request, 'core/candidate_data_thanks.html')
+
+    if request.method == 'POST':
+        form = CandidateDataForm(request.POST, instance=candidate)
+        if form.is_valid():
+            form.save()
+            application.personal_data_submitted_at = timezone.now()
+            application.save()
+            return render(request, 'core/candidate_data_thanks.html')
+    else:
+        form = CandidateDataForm(instance=candidate)
+
+    context = {
+        'form': form,
+        'candidate_name': candidate.get_full_name(),
+        'job_title': application.job.title
+    }
+    return render(request, 'core/candidate_data_form.html', context)

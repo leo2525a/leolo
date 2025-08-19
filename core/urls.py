@@ -15,7 +15,7 @@ urlpatterns = [
     # Employee Pages
     path('profile/', views.profile_view, name='profile'),
     path('directory/', views.employee_directory_view, name='employee_directory'),
-    
+    path('profile/edit/', views.profile_edit_view, name='profile_edit'),
     # Leave Management
     path('leave/apply/', views.leave_apply_view, name='leave_apply'),
     
@@ -26,6 +26,7 @@ urlpatterns = [
     path('attendance/', views.attendance_view, name='attendance'),
     path('attendance/clock-in-out/', views.clock_in_out_view, name='clock_in_out'),
     path('manager/manual-attendance/', views.manual_attendance_view, name='manual_attendance'),
+    path('apply/candidate-data/<uuid:token>/', views.candidate_data_form_view, name='candidate_data_form'),
 
 
     # Manager Pages

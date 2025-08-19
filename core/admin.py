@@ -6,7 +6,7 @@ from .models import (Department, Position, Employee, LeaveType, LeaveRequest,
                      EmployeeDocument, ReviewCycle, PerformanceReview, Goal, Announcement,
                      OnboardingChecklist, EmployeeTask, SiteConfiguration, LeavePolicy, 
                      PolicyRule, WorkSchedule, ScheduleRule, DutyShift, ContractTemplate,SalaryHistory,
-                     PublicHoliday, LeaveBalanceAdjustment,JobOpening, Candidate, Application
+                     PublicHoliday, LeaveBalanceAdjustment,JobOpening, Candidate, Application, EmailTemplate
                      ,PayrollRun, Payslip, PayslipItem, SalaryHistory,PayrollConfiguration, LeaveBalance) # 確保所有模型都已匯入
 from django.urls import reverse
 from django.core.files.base import ContentFile
@@ -64,6 +64,48 @@ class ApplicationInline(admin.TabularInline):
 
 
 # --- ACTION FUNCTIONS ---
+
+def send_interview_invitation_action(modeladmin, request, queryset):
+    template = EmailTemplate.objects.first()
+    if not template:
+        modeladmin.message_user(request, "錯誤：找不到任何 Email 樣板，請先建立一個。", messages.ERROR)
+        return
+
+    sent_count = 0
+    for application in queryset:
+        # 建立專屬連結
+        form_url = request.build_absolute_uri(
+            reverse('core:candidate_data_form', args=[application.token])
+        )
+
+        context_data = {
+            'candidate_full_name': application.candidate.get_full_name(),
+            'candidate_email': application.candidate.email,
+            'job_title': application.job.title,
+            'interview_form_url': form_url,
+        }
+        
+        # 渲染樣板
+        subject = Template(template.subject).render(Context(context_data))
+        body = Template(template.body).render(Context(context_data))
+
+        # 發送郵件
+        try:
+            send_mail(
+                subject,
+                body,
+                settings.DEFAULT_FROM_EMAIL,
+                [application.candidate.email],
+                fail_silently=False,
+            )
+            sent_count += 1
+        except Exception as e:
+            modeladmin.message_user(request, f"發送給 {application.candidate.email} 失敗: {e}", messages.ERROR)
+
+    if sent_count > 0:
+        modeladmin.message_user(request, f"已成功為 {sent_count} 個應徵記錄發送面試邀請。", messages.SUCCESS)
+
+send_interview_invitation_action.short_description = "發送面試邀請及資料填寫連結"
 
 @transaction.atomic
 def generate_payslips_action(modeladmin, request, queryset):
@@ -235,14 +277,45 @@ class PayslipInline(admin.TabularInline):
         return False
 
 # --- MODEL ADMIN CLASSES ---
-admin.register(Employee)
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'subject', 'created_at')
+    change_form_template = "admin/core/contracttemplate/change_form.html" # 重用合約的樣板
+
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        placeholders = [
+            {'group': '應聘者資料', 'name': '全名', 'value': '{{ candidate_full_name }}'},
+            {'group': '應聘者資料', 'name': 'Email', 'value': '{{ candidate_email }}'},
+            {'group': '職位資料', 'name': '應徵職位', 'value': '{{ job_title }}'},
+            {'group': '系統生成', 'name': '個人資料填寫連結', 'value': '{{ interview_form_url }}'},
+        ]
+        context['placeholders_json'] = json.dumps(placeholders)
+        context['title'] = "編輯 Email 樣板" # 改變頁面標題
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+
+@admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
     list_display = ('employee_number', 'user', 'department', 'position', 'status', 'leave_policy','work_schedule')
     list_filter = ('department', 'position', 'status')
     search_fields = ('employee_number', 'user__username', 'user__first_name', 'user__last_name')
     raw_id_fields = ('user', 'manager')
+    
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('user', 'gender', 'date_of_birth', 'nationality', 'id_number', 'marital_status')
+        }),
+        ('Job Details', {
+            'fields': ('employee_number', 'department', 'position', 'manager', 'hire_date', 'termination_date')
+        }),
+        ('Contact Information', {
+            'fields': ('phone_number', 'emergency_contact_name', 'emergency_contact_phone', 'residential_address', 'correspondence_address','email_original')
+        }),
+        ('Employment Status', {
+            'fields': ('status', 'employment_type', 'work_schedule', 'leave_policy')
+        }),
+    )
 
-    # The 'inlines' and 'actions' from your file are preserved
     inlines = [EmployeeDocumentInline, SalaryHistoryInline]
     actions = [assign_onboarding_checklist, generate_contract_action]
 
@@ -429,6 +502,7 @@ class ApplicationAdmin(admin.ModelAdmin):
     list_filter = ('status', 'job')
     search_fields = ('candidate__first_name', 'candidate__last_name', 'job__title')
     raw_id_fields = ('job', 'candidate')
+    actions = [send_interview_invitation_action]
 
 @admin.register(PayrollRun)
 class PayrollRunAdmin(admin.ModelAdmin):

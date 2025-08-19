@@ -3,6 +3,7 @@
 from django import forms
 from .models import LeaveRequest,OvertimeRequest,Candidate, Employee
 from datetime import date
+from django.contrib.auth.models import User
 
 class LeaveRequestForm(forms.ModelForm):
     class Meta:
@@ -52,3 +53,22 @@ class TaxReportForm(forms.Form):
         help_text="請輸入課稅年度的開始年份，例如 2024 代表 2024/25 年度。",
         widget=forms.NumberInput(attrs={'class': 'form-control'})
     )
+
+class UserUpdateForm(forms.ModelForm):
+    email = forms.EmailField()
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+
+class EmployeeUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Employee
+        fields = [
+            'gender', 'date_of_birth', 'nationality', 'id_number',
+            'marital_status', 'phone_number', 'emergency_contact_name',
+            'emergency_contact_phone', 'residential_address', 'correspondence_address'
+        ]
+        widgets = {
+            'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
+        }

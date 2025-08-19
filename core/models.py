@@ -9,6 +9,7 @@ from decimal import Decimal
 from datetime import timedelta, datetime, date
 from ckeditor.fields import RichTextField
 import holidays
+import uuid
 
 
 class Department(models.Model):
@@ -128,34 +129,36 @@ class ScheduleRule(models.Model):
         return f"{self.schedule.name}: {self.get_day_of_week_display()} ({self.start_time}-{self.end_time})"
 
 class Employee(models.Model):
-    STATUS_CHOICES = (
-        ('Active', '在職'),
-        ('Inactive', '離職'),
-    )
-    GENDER_CHOICES = (
-        ('Male', '男性'),
-        ('Female', '女性'),
-        ('Other', '其他'),
-    )
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="登入帳號")
-    employee_number = models.CharField(max_length=50, unique=True, verbose_name="員工編號")
-    phone_number = models.CharField(max_length=50, blank=True, verbose_name="電話")
-    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True, verbose_name="性別")
-    marital_status = models.CharField(max_length=20, blank=True, verbose_name="婚姻狀況", help_text="例如：單身、已婚")
-    spouse_name = models.CharField(max_length=255, blank=True, verbose_name="配偶姓名")
-    spouse_id_number = models.CharField(max_length=50, blank=True, verbose_name="配偶身分證號碼")
-    residential_address = models.TextField(blank=True, verbose_name="住址")
-    correspondence_address = models.TextField(blank=True, verbose_name="通訊地址(如不同)")
-    hire_date = models.DateField(verbose_name="入職日期")
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所屬部門")
-    position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="擔任職位")
-    manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直屬主管", related_name='manager_of') # <-- 加上 related_name
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Active', verbose_name="狀態")
-    leave_policy = models.ForeignKey(LeavePolicy, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="年假策略")
-    compensatory_leave_balance_hours = models.DecimalField(max_digits=7, decimal_places=2, default=0, verbose_name="補休餘額 (小時)")
-    work_schedule = models.ForeignKey(WorkSchedule, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="預設班表")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='employee_profile')
+    employee_number = models.CharField(max_length=10, unique=True, blank=True, null=True)
+    department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
+    position = models.ForeignKey('Position', on_delete=models.SET_NULL, null=True, blank=True)
+    manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
+
+    # Personal Information
+    gender = models.CharField(max_length=10, choices=[('Male', '男性'), ('Female', '女性'), ('Other', '其他')], null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True, verbose_name=("出生日期"))
+    nationality = models.CharField(max_length=50, blank=True, null=True, verbose_name=("國籍"))
+    id_number = models.CharField(max_length=30, blank=True, null=True, verbose_name=("身分證號碼"))
+    marital_status = models.CharField(max_length=20, choices=[('Single', '未婚'), ('Married', '已婚'), ('Divorced', '離婚'), ('Widowed', '喪偶')], null=True, blank=True)
+
+    # Contact Information
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    emergency_contact_name = models.CharField(max_length=100, blank=True, null=True, verbose_name=("緊急聯絡人姓名"))
+    emergency_contact_phone = models.CharField(max_length=20, blank=True, null=True, verbose_name=("緊急聯絡人電話"))
+    email_original= models.CharField(max_length=100, blank=True, verbose_name=("緊急聯絡Email"))
+    residential_address = models.TextField(blank=True, null=True)
+    correspondence_address = models.TextField(blank=True, null=True)
     
+    # Employment Details
+    hire_date = models.DateField()
+    termination_date = models.DateField(null=True, blank=True, verbose_name=("離職日期"))
+    status = models.CharField(max_length=20, choices=[('Active', '在職'), ('On Leave', '休假中'), ('Terminated', '已離職')], default='Active')
+    employment_type = models.CharField(max_length=20, choices=[('Full-time', '全職'), ('Part-time', '兼職'), ('Contract', '合約')], default='Full-time', verbose_name=("僱傭類型"))
+    work_schedule = models.ForeignKey('WorkSchedule', on_delete=models.SET_NULL, null=True, blank=True)
+    leave_policy = models.ForeignKey('LeavePolicy', on_delete=models.SET_NULL, null=True, blank=True)
+
 
     
     def __str__(self):
@@ -166,6 +169,23 @@ class Employee(models.Model):
         獲取該員工最新的、已生效的薪資記錄。
         """
         return self.salary_history.filter(effective_date__lte=date.today()).order_by('-effective_date').first()
+
+    def is_profile_complete(self):
+        """
+        檢查所有必要的個人資料欄位是否都已填寫。
+        """
+        required_fields = [
+            self.gender,
+            self.date_of_birth,
+            self.nationality,
+            self.id_number,
+            self.marital_status,
+            self.phone_number,
+            self.emergency_contact_name,
+            self.emergency_contact_phone,
+            self.residential_address,
+        ]
+        return all(field is not None and field != '' for field in required_fields)
 
 class SalaryHistory(models.Model):
     CHANGE_REASON_CHOICES = (
@@ -470,6 +490,10 @@ class Candidate(models.Model):
     phone = models.CharField(max_length=50, blank=True, verbose_name="電話")
     resume = models.FileField(upload_to='resumes/', verbose_name="履歷檔案")
     created_at = models.DateTimeField(auto_now_add=True)
+    address = models.TextField(blank=True, null=True, verbose_name="通訊地址")
+    expected_salary = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name="期望薪資")
+    earliest_start_date = models.DateField(blank=True, null=True, verbose_name="最早可到職日")
+    linkedin_profile = models.URLField(blank=True, null=True, verbose_name="LinkedIn 個人檔案")
 
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}"
@@ -492,6 +516,10 @@ class Application(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Applied', verbose_name="應徵狀態")
     applied_at = models.DateTimeField(auto_now_add=True, verbose_name="應徵時間")
     notes = models.TextField(blank=True, verbose_name="內部備註")
+    # 用於生成安全、唯一的表單連結
+    token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    # 用於追蹤應聘者是否已提交資料
+    personal_data_submitted_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         unique_together = ('job', 'candidate') # 確保同一位候選人對同一個職位只能應徵一次
@@ -604,3 +632,13 @@ class LeaveBalance(models.Model):
 
     def __str__(self):
         return f"{self.employee.user.username} - {self.leave_type.name}: {self.balance_hours} hours"
+
+class EmailTemplate(models.Model):
+    name = models.CharField(max_length=100, verbose_name="樣板名稱")
+    subject = models.CharField(max_length=255, verbose_name="郵件主旨")
+    body = models.TextField(verbose_name="郵件內容", help_text="請使用佔位符來插入動態內容。")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name

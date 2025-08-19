@@ -1,0 +1,23 @@
+{% extends 'core/base.html' %}
+{% block title %}補充個人資料{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Hi, {{ candidate_name }}</h3>
+                    <p>感謝您應徵我們的「{{ job_title }}」職位。請填寫以下資料以完成申請流程。</p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary mt-3">提交資料</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

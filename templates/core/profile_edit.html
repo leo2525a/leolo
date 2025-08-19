@@ -1,0 +1,41 @@
+{% extends 'core/base.html' %}
+
+{% block title %}編輯個人資料{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3>編輯您的個人資料</h3>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <fieldset class="form-group">
+                            <legend class="border-bottom mb-4">使用者資訊</legend>
+                            {{ user_form.as_p }}
+                        </fieldset>
+                        <fieldset class="form-group mt-4">
+                            <legend class="border-bottom mb-4">員工詳細資料</legend>
+                            {{ employee_form.as_p }}
+                        </fieldset>
+                        <div class="form-group mt-4">
+                            <button class="btn btn-primary" type="submit">儲存更新</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
