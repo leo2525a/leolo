@@ -11,6 +11,11 @@ from ckeditor.fields import RichTextField
 import holidays
 import uuid
 
+class Role(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name='角色名稱')
+
+    def __str__(self):
+        return self.name
 
 class Department(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name="部門名稱")
@@ -135,6 +140,7 @@ class Employee(models.Model):
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     position = models.ForeignKey('Position', on_delete=models.SET_NULL, null=True, blank=True)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='職級角色')
 
     # Personal Information
     gender = models.CharField(max_length=10, choices=[('Male', '男性'), ('Female', '女性'), ('Other', '其他')], null=True, blank=True)
@@ -187,6 +193,11 @@ class Employee(models.Model):
         ]
         return all(field is not None and field != '' for field in required_fields)
 
+    @property
+    def is_manager(self):
+        """檢查此員工是否為任何其他員工的經理"""
+        return self.manager_of.exists()
+        
 class SalaryHistory(models.Model):
     CHANGE_REASON_CHOICES = (
         ('New Hire', '新進人員'),

@@ -1,177 +1,240 @@
 {% extends 'core/base.html' %}
+{% load static %}
 
-{% block title %}My Profile{% endblock %}
-
-{% block extra_css %}
-<style>
-    .document-list {
-    list-style-type: none;
-    padding-left: 0;
-    }
-    .document-list li {
-        padding: 10px;
-        border-bottom: 1px solid #eee;
-    }
-    .document-list li:last-child {
-        border-bottom: none;
-    }
-    .document-list a {
-        font-weight: 500;
-        text-decoration: none;
-        color: #007bff;
-    }
-    .document-list a:hover {
-        text-decoration: underline;
-    }
-    .upload-date {
-        color: #6c757d;
-        font-size: 0.85rem;
-    }
-
-    .profile-card { padding: 20px 30px; }
-    .profile-card p { line-height: 1.6; }
-    .profile-card strong { color: #000; }
-    .actions-bar { margin-top: 20px; }
-    .leave-table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px; }
-    .leave-table th, .leave-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    .leave-table th { background-color: #f2f2f2; }
-
-    .stats-container {
-    display: flex;
-    justify-content: space-around;
-    text-align: center;
-    padding: 20px 0;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #eee;
-    }
-    .stat-card {
-        padding: 10px;
-    }
-    .stat-card .number {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #007bff;
-    }
-    .stat-card .label {
-        font-size: 0.9rem;
-        color: #6c757d;
-    }
-    .announcement-section {
-    margin-top: 20px;
-    margin-bottom: 20px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    }
-    .announcement {
-        border-bottom: 1px solid #e9ecef;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
-    }
-    .announcement:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-    }
-    .announcement h4 {
-        margin-bottom: 5px;
-    }
-    .announcement p {
-        margin-bottom: 8px;
-    }
-
-</style>
-{% endblock %}
+{% block title %}員工儀表板{% endblock %}
 
 {% block content %}
-    <div class="profile-card">
-        <h1>個人儀表板</h1>
+<div class="container-fluid px-4">
+    <h1 class="mt-4">儀表板</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item active">歡迎回來, {{ user.get_full_name|default:user.username }}！</li>
+    </ol>
 
-        {% if latest_announcements %}
-        <div class="announcement-section">
-            <h2>最新公告</h2>
-            {% for announcement in latest_announcements %}
-                <div class="announcement">
-                    <h4>{{ announcement.title }}</h4>
-                    <p>{{ announcement.content|linebreaksbr }}</p>
-                    <small class="text-muted">發布於: {{ announcement.created_at|date:"Y-m-d" }} by {{ announcement.author.get_full_name|default:announcement.author.username }}</small>
+    <div class="row">
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-primary text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                        <div class="text-end">
+                            <div class="fs-3">{{ total_employees }}</div>
+                            <div>總在職員工</div>
+                        </div>
+                    </div>
                 </div>
-            {% endfor %}
+            </div>
         </div>
-    {% endif %}
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-warning text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <i class="fas fa-user-clock fa-2x"></i>
+                        </div>
+                        <div class="text-end">
+                            <div class="fs-3">{{ on_leave_today }}</div>
+                            <div>今日休假人數</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-success text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <i class="fas fa-hourglass-half fa-2x"></i>
+                        </div>
+                        <div class="text-end">
+                            <div class="fs-3">{{ pending_requests }}</div>
+                            <div>我的待處理請求</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-danger text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <i class="fas fa-briefcase fa-2x"></i>
+                        </div>
+                        <div class="text-end">
+                            <div class="fs-3">{{ open_positions }}</div>
+                            <div>開放中職缺</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-        <div class="stats-container">
-            {% for balance in leave_balances_data %}
-                <div class="stat-card">
-                    <div class="number">{{ balance.remaining|floatformat:2 }}</div>
-                    <div class="label">{{ balance.name }} 剩餘時數</div>
-                    <small>(總額度: {{ balance.total|floatformat:2 }}, 已用: {{ balance.used|floatformat:2 }})</small>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-history me-1"></i>
+                    我最近的休假申請
                 </div>
-            {% empty %}
-                <p>尚無假期餘額資料。</p>
-            {% endfor %}
-        </div>
-
-        {% if messages %}
-            <div class="messages">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    {{ message }}
+                <div class="card-body">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>申請類型</th>
+                                <th>開始時間</th>
+                                <th>結束時間</th>
+                                <th>狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in leave_requests %}
+                            <tr>
+                                <td>{{ req.leave_type.name }}</td>
+                                <td>{{ req.start_datetime|date:"Y-m-d H:i" }}</td>
+                                <td>{{ req.end_datetime|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge bg-success">已批准</span>
+                                    {% elif req.status == 'Rejected' %}
+                                        <span class="badge bg-danger">已拒絕</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">待處理</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">沒有休假申請記錄。</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            {% endfor %}
             </div>
-        {% endif %}
-
-        <hr>
-        <p><strong>員工編號:</strong> {{ employee.employee_number }}</p>
-        <p><strong>部門:</strong> {{ employee.department.name }}</p>
-        <p><strong>職位:</strong> {{ employee.position.title }}</p>
-        <p><strong>目前薪資:</strong> {% if current_salary %}${{ current_salary.base_salary|floatformat:2 }}{% else %}N/A{% endif %}</p>
-        <p><strong>入職日期:</strong> {{ employee.hire_date }}</p>
-        <p><strong>狀態:</strong> {{ employee.get_status_display }}</p>
-        <hr style="margin-top: 30px; margin-bottom: 30px;">
-        <h2>我的請假記錄</h2>
-
-        {% if leave_requests %}
-            <table class="leave-table">
-                <thead>
-                    <tr>
-                        <th>假別</th>
-                        <th>開始日期</th>
-                        <th>結束日期</th>
-                        <th>狀態</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for request in leave_requests %}
-                        <tr>
-                            <td>{{ request.leave_type.name }}</td>
-                            <td>{{ request.start_datetime|date:"Y-m-d H:i" }}</td>
-                            <td>{{ request.end_datetime|date:"Y-m-d H:i" }}</td>
-                            <td>{{ request.get_status_display }}</td>                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>您目前沒有任何請假記錄。</p>
-        {% endif %}
-        <hr style="margin-top: 30px; margin-bottom: 30px;">
-        <h2>我的文件</h2>
-        {% with documents=employee.documents.all %}
-            {% if documents %}
-                <ul class="document-list">
-                    {% for doc in documents %}
-                        <li>
-                            <a href="{{ doc.file.url }}" target="_blank">{{ doc.title }}</a>
-                            <span class="upload-date"> (上傳於: {{ doc.uploaded_at|date:"Y-m-d" }})</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>目前沒有任何個人文件。</p>
-            {% endif %}
-        {% endwith %}
         </div>
-    {% endblock %}
-   
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie me-1"></i>
+                    假期餘額概覽 (小時)
+                </div>
+                <div class="card-body">
+                    <canvas id="leaveBalanceChart" width="100%" height="100"></canvas>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-bullhorn me-1"></i>
+                    最新公告
+                </div>
+                <div class="card-body">
+                    {% for announcement in latest_announcements %}
+                    <div class="mb-3">
+                        <h6 class="mb-1">{{ announcement.title }}</h6>
+                        <small class="text-muted">{{ announcement.created_at|date:"Y-m-d" }}</small>
+                        <p class="mb-0">{{ announcement.content|truncatewords:20 }}</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-center">目前沒有公告。</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ leave_balances_data|json_script:"leave-balance-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. 獲取從 Django 傳來的數據
+    const leaveBalanceData = JSON.parse(document.getElementById('leave-balance-data').textContent);
+
+    // 2. 準備圖表所需的標籤和數據
+    const labels = leaveBalanceData.map(item => item.name);
+    const remainingHours = leaveBalanceData.map(item => item.remaining);
+    const usedHours = leaveBalanceData.map(item => item.used);
+
+    // 3. 獲取 Canvas 元素
+    const ctx = document.getElementById('leaveBalanceChart').getContext('2d');
+
+    // 4. 建立並設定甜甜圈圖
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '已使用 (小時)',
+                data: usedHours,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.5)',
+                    'rgba(54, 162, 235, 0.5)',
+                    'rgba(255, 206, 86, 0.5)',
+                    'rgba(75, 192, 192, 0.5)',
+                    'rgba(153, 102, 255, 0.5)',
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                ],
+                borderWidth: 1
+            },
+            {
+                label: '剩餘 (小時)',
+                data: remainingHours,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== null) {
+                                label += context.parsed + ' 小時';
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -7,6 +7,7 @@ from datetime import date
 
 register = template.Library()
 
+    
 @register.filter(name='get_item')
 def get_item(dictionary, key):
     # 這個過濾器讓您在樣板中能用變數作為字典的鍵來取值

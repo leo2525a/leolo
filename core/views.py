@@ -44,18 +44,28 @@ def profile_view(request):
         messages.error(request, '無法找到您的員工資料。超級使用者請使用管理後台。')
         return redirect('admin:index')
 
-    # 1. FIRST, check if the profile is complete.
+    # 1. 檢查個人資料是否完整
     if not employee.is_profile_complete():
-        # If incomplete, redirect to the edit page immediately.
         return redirect('core:profile_edit')
 
-    # 2. If the profile IS complete, proceed with your original data gathering.
-    leave_balances_data = []
-    
-    # Fetch leave requests
+    # --- 2. 抓取儀表板所需的全部數據 ---
+
+    # (A) 頂部四個統計卡片的數據
+    today = date.today()
+    total_employees = Employee.objects.filter(status='Active').count()
+    on_leave_today = LeaveRequest.objects.filter(
+        status='Approved',
+        start_datetime__date__lte=today,
+        end_datetime__date__gte=today
+    ).count()
+    pending_requests = LeaveRequest.objects.filter(employee=employee, status='Pending').count()
+    open_positions = JobOpening.objects.filter(status='Open').count()
+
+    # (B) 最近的休假申請 (與之前相同)
     leave_requests = LeaveRequest.objects.filter(employee=employee).order_by('-start_datetime')[:5]
-    
-    # Fetch leave balances
+
+    # (C) 假期餘額數據 (與之前相同，用於圖表)
+    leave_balances_data = []
     balances = employee.leave_balances.all().select_related('leave_type')
     for balance in balances:
         used_hours = LeaveRequest.objects.filter(
@@ -66,20 +76,24 @@ def profile_view(request):
 
         leave_balances_data.append({
             'name': balance.leave_type.name,
-            'total': balance.balance_hours,
-            'used': used_hours,
-            'remaining': balance.balance_hours - used_hours
+            'total': float(balance.balance_hours),
+            'used': float(used_hours),
+            'remaining': float(balance.balance_hours - used_hours)
         })
 
-    # Fetch other data
-    current_salary = employee.get_current_salary()
+    # (D) 最新公告 (與之前相同)
     latest_announcements = Announcement.objects.filter(is_published=True).order_by('-created_at')[:3]
 
     context = {
         'employee': employee,
+        # 新增的統計數據
+        'total_employees': total_employees,
+        'on_leave_today': on_leave_today,
+        'pending_requests': pending_requests,
+        'open_positions': open_positions,
+        # 原有的數據
         'leave_requests': leave_requests,
         'latest_announcements': latest_announcements,
-        'current_salary': current_salary,
         'leave_balances_data': leave_balances_data,
     }
     return render(request, 'core/profile.html', context)

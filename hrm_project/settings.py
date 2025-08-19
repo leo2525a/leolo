@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core",
     'django_apscheduler',
+    'widget_tweaks',
     'ckeditor',
 ]
 

@@ -1,106 +1,162 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}HRM System{% endblock %}</title>
+
+    <!-- 1. 引入 Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    
+    <!-- 2. 引入 Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" xintegrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
     <style>
+        /* 整體佈局樣式 */
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0; 
-            background-color: #f8f9fa;
-            color: #343a40;
+            background-color: #f8f9fa; /* 淺灰色背景 */
         }
-        .navbar {
-            background-color: #ffffff;
-            padding: 1rem 2rem;
-            border-bottom: 1px solid #dee2e6;
+        .wrapper {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,.05);
+            width: 100%;
+            min-height: 100vh;
         }
-        .navbar a {
+        
+        /* 側邊欄樣式 */
+        #sidebar {
+            width: 250px;
+            min-width: 250px;
+            background: #343a40; /* 深色背景 */
+            color: #fff;
+            transition: all 0.3s;
+        }
+        #sidebar .sidebar-header {
+            padding: 20px;
+            background: #495057;
+            text-align: center;
+        }
+        #sidebar .sidebar-header h3 {
+            color: #fff;
+            margin-bottom: 0;
+        }
+        #sidebar ul.components {
+            padding: 20px 0;
+            border-bottom: 1px solid #47748b;
+        }
+        #sidebar ul p {
+            color: #fff;
+            padding: 10px;
+        }
+        #sidebar ul li a {
+            padding: 10px 20px;
+            font-size: 1.1em;
+            display: block;
+            color: #adb5bd;
             text-decoration: none;
-            color: #495057;
-            font-weight: 500;
-            margin-left: 1.5rem;
+            transition: all 0.3s;
         }
-        .navbar .brand {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #007bff;
-            margin-left: 0;
+        #sidebar ul li a:hover {
+            color: #ffffff;
+            background: #495057;
         }
-        .navbar .user-info {
-            color: #6c757d;
+        #sidebar ul li.active > a, a[aria-expanded="true"] {
+            color: #fff;
+            background: #007bff;
         }
-        .container {
-            max-width: 960px;
-            margin: 2rem auto;
-            padding: 1.5rem;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        #sidebar .logout-form {
+            padding: 20px;
         }
         .link-button {
-            background: none; border: none; color: #007bff; text-decoration: none; cursor: pointer;
-            padding: 0; font-size: inherit; font-family: inherit; font-weight: 500;
+            background: none; border: none; color: #adb5bd; text-decoration: none; cursor: pointer;
+            padding: 0; font-size: 1.1em; font-family: inherit; width: 100%; text-align: left;
         }
-        .link-button:hover { text-decoration: underline; }
-        /* 沿用之前的 alert 樣式 */
-        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 4px; }
-        .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
+        .link-button:hover { color: #ffffff; }
+
+        /* 主要內容區域樣式 */
+        #content {
+            width: 100%;
+            padding: 20px;
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+        .navbar-light {
+            background-color: #fff !important;
+        }
     </style>
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar">
-        <a href="{% url 'core:profile' %}" class="brand">Love 21</a>
-        <div>
-            {% if user.is_authenticated %}
-                <span class="user-info">Welcome, {{ user.first_name }}!</span>
-                <a href="{% url 'core:profile' %}">個人資料</a>
-                <a href="{% url 'core:attendance' %}">出勤打卡</a> 
-                <a href="{% url 'core:leave_apply' %}">申請休假</a>
-                <a href="{% url 'core:employee_directory' %}">員工目錄</a>
-                <a href="{% url 'core:team_schedule_current' %}">團隊月表</a> 
-                <a href="{% url 'core:my_reviews' %}">我的評估</a>
-                <a href="{% url 'core:job_board' %}">招聘職位</a>
-                <a href="{% url 'core:onboarding' %}">入職任務</a>
-                <a href="{% url 'core:overtime_apply' %}">申請加班</a>
-                {% if user.employee.manager_of.exists %}
-                <a href="{% url 'core:manager_dashboard' %}">團隊管理</a>
-                <a href="{% url 'core:analytics' %}">分析儀表板</a>
-                {% endif %}
+    <div class="wrapper">
+        <!-- 左側側邊欄 -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <h3>Love 21 HRM</h3>
+            </div>
 
-                {% if user.is_staff %}
-                    <a href="{% url 'core:reporting' %}">報告中心</a>
-                {% endif %}
+            <ul class="list-unstyled components">
+                <p class="ps-3">員工功能</p>
+                <li><a href="{% url 'core:profile' %}"><i class="fas fa-user me-2"></i>個人資料</a></li>
+                <li><a href="{% url 'core:attendance' %}"><i class="fas fa-clock me-2"></i>出勤打卡</a></li>
+                <li><a href="{% url 'core:leave_apply' %}"><i class="fas fa-plane-departure me-2"></i>申請休假</a></li>
+                <li><a href="{% url 'core:overtime_apply' %}"><i class="fas fa-business-time me-2"></i>申請加班</a></li>
+                <li><a href="{% url 'core:employee_directory' %}"><i class="fas fa-address-book me-2"></i>員工目錄</a></li>
+                <li><a href="{% url 'core:team_schedule_current' %}"><i class="fas fa-calendar-alt me-2"></i>團隊月表</a></li>
+                <li><a href="{% url 'core:my_reviews' %}"><i class="fas fa-star me-2"></i>我的評估</a></li>
+                <li><a href="{% url 'core:onboarding' %}"><i class="fas fa-tasks me-2"></i>入職任務</a></li>
 
-                <form method="post" action="{% url 'core:logout' %}" style="display: inline; margin-left: 1.5rem;">
+                <!-- 經理與管理員專用功能 -->
+                {# 👇 This is the corrected and simplified condition 👇 #}
+                {% if user.is_staff or user.employee_profile.has_management_access %}
+                <p class="ps-3 mt-4">管理功能</p>
+                <li><a href="{% url 'core:manager_dashboard' %}"><i class="fas fa-users-cog me-2"></i>團隊管理</a></li>
+                <li><a href="{% url 'core:analytics' %}"><i class="fas fa-chart-line me-2"></i>分析儀表板</a></li>
+                <li><a href="{% url 'core:reporting' %}"><i class="fas fa-file-export me-2"></i>報告中心</a></li>
+                <li><a href="{% url 'core:job_board' %}"><i class="fas fa-search-plus me-2"></i>招聘職位</a></li>
+                {% endif %}
+            </ul>
+            
+            <div class="logout-form">
+                {% if user.is_authenticated %}
+                <form method="post" action="{% url 'core:logout' %}">
                     {% csrf_token %}
-                    <button type="submit" class="link-button">登出</button>
+                    <button type="submit" class="btn btn-secondary w-100">
+                        <i class="fas fa-sign-out-alt me-2"></i>登出
+                    </button>
                 </form>
-            {% else %}
-                <a href="{% url 'core:login' %}">登入</a>
-            {% endif %}
-        </div>
-    </nav>
+                {% endif %}
+            </div>
+        </nav>
 
-    <div class="container mt-4">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-        {% block content %}{% endblock %}
+        <!-- 右側主要內容 -->
+        <div id="content">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 rounded">
+                <div class="container-fluid">
+                    <span class="navbar-text">
+                        歡迎, {{ user.get_full_name|default:user.username }}!
+                    </span>
+                </div>
+            </nav>
+
+            {% if messages %}
+                <div class="container-fluid">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+            
+            {% block content %}{% endblock %}
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap 5 JavaScript Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     
     {% block extra_js %}{% endblock %}
-
 </body>
 </html>

@@ -2,7 +2,8 @@
 from django.contrib import admin, messages
 from django.db import transaction, models
 from django.utils.html import format_html
-from .models import (Department, Position, Employee, LeaveType, LeaveRequest, 
+from django.core.mail import send_mail, settings
+from .models import (Role,Department, Position, Employee, LeaveType, LeaveRequest, 
                      EmployeeDocument, ReviewCycle, PerformanceReview, Goal, Announcement,
                      OnboardingChecklist, EmployeeTask, SiteConfiguration, LeavePolicy, 
                      PolicyRule, WorkSchedule, ScheduleRule, DutyShift, ContractTemplate,SalaryHistory,
@@ -277,6 +278,11 @@ class PayslipInline(admin.TabularInline):
         return False
 
 # --- MODEL ADMIN CLASSES ---
+@admin.register(Role)
+class RoleAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(admin.ModelAdmin):
     list_display = ('name', 'subject', 'created_at')
@@ -300,21 +306,26 @@ class EmployeeAdmin(admin.ModelAdmin):
     list_filter = ('department', 'position', 'status')
     search_fields = ('employee_number', 'user__username', 'user__first_name', 'user__last_name')
     raw_id_fields = ('user', 'manager')
+    autocomplete_fields = ['user', 'manager', 'role'] 
     
     fieldsets = (
-        ('Personal Information', {
-            'fields': ('user', 'gender', 'date_of_birth', 'nationality', 'id_number', 'marital_status')
+        ('個人資訊', {
+            'fields': ('user', 'employee_number', 'status', 'gender', 'date_of_birth')
         }),
-        ('Job Details', {
-            'fields': ('employee_number', 'department', 'position', 'manager', 'hire_date', 'termination_date')
+        ('職位資訊', {
+            'fields': ('department', 'position', 'manager', 'hire_date', 'role')
         }),
-        ('Contact Information', {
-            'fields': ('phone_number', 'emergency_contact_name', 'emergency_contact_phone', 'residential_address', 'correspondence_address','email_original')
+        ('聯絡方式', {
+            'fields': ('phone_number', 'emergency_contact_name', 'emergency_contact_phone')
         }),
-        ('Employment Status', {
-            'fields': ('status', 'employment_type', 'work_schedule', 'leave_policy')
+        ('地址資訊', {
+            'fields': ('residential_address', 'correspondence_address')
+        }),
+        ('身份資訊', {
+            'fields': ('id_number', 'marital_status', 'spouse_name', 'spouse_id_number')
         }),
     )
+
 
     inlines = [EmployeeDocumentInline, SalaryHistoryInline]
     actions = [assign_onboarding_checklist, generate_contract_action]
